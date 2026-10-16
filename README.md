@@ -15,7 +15,8 @@ Toda la interfaz está en español.
   perfecto de 20 segundos. También puedes subir tus propios MP4 o importar música de Pixabay.
 - **Cola de video**: elige qué videos se emiten, cuántas horas cada uno y en qué orden. Se puede
   cambiar en caliente sin cortar el directo.
-- **Emisión 24/7**: un vigilante relanza la emisión si se cae. Modo *local* para probar sin clave
+- **Emisión 24/7**: la salida a YouTube reconecta sola, sin límite de intentos y sin cortar la vista
+  previa, y un vigilante relanza la emisión si el codificador se cae. Modo *local* para probar sin clave
   y modo *directo* para YouTube.
 - **Vista previa**: reproductor del directo dentro del panel y acceso por RTSP para VLC.
 

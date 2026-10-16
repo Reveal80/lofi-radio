@@ -811,6 +811,7 @@
     <div class="tabs">
       <button class="tab on" data-log="stream" onclick="verLog('stream')">Emisión</button>
       <button class="tab" data-log="vigilante" onclick="verLog('vigilante')">Vigilante 24/7</button>
+      <button class="tab" data-log="anterior" onclick="verLog('anterior')" title="Final del registro de la emisión anterior: útil para ver por qué se cortó">Emisión anterior</button>
     </div>
     <div class="right">
       <button class="btn sm" onclick="copiarLog()">Copiar</button>
@@ -1194,11 +1195,11 @@ async function refresh() {
 
 // ---------------- panel de logs ----------------
 let logActual = "stream", logTimer = null;
-const LOG_NOMBRE = {stream: "STREAM.LOG", vigilante: "WATCHDOG.LOG"};
+const LOG_NOMBRE = {stream: "STREAM.LOG", vigilante: "WATCHDOG.LOG", anterior: "STREAM.LOG.1"};
 async function cargarLogs() {
   try {
     const j = await api("/api/logs"), pre = $("s-log");
-    const texto = j[logActual] || (logActual === "stream" ? "Aún no hay emisión registrada." : "El vigilante no ha tenido que relanzar la emisión.");
+    const texto = j[logActual] || {stream: "Aún no hay emisión registrada.", vigilante: "El vigilante no ha tenido que relanzar la emisión.", anterior: "Aún no hay una emisión anterior registrada."}[logActual];
     const abajo = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 30;
     if (pre.textContent !== texto) { pre.textContent = texto; if (abajo) pre.scrollTop = pre.scrollHeight; }
     $("log-upd").textContent = "actualizado " + new Date().toLocaleTimeString("es-ES");

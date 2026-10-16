@@ -23,7 +23,7 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 import escenas
 import lofigen
 
-VERSION = "1.5"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
+VERSION = "1.6"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
 BASE = Path(__file__).parent
 TRACKS_DIR = BASE / "data" / "tracks"
 VIDEOS_DIR = BASE / "data" / "videos"    # biblioteca de videos + cola
@@ -37,8 +37,18 @@ TITULOS_FILE = VIDEOS_DIR / "titulos.json"     # nombre visible de cada video (e
 TITULOS_MUSICA = TRACKS_DIR / "titulos.json"   # títulos editados de las canciones
 ORDEN_MUSICA = TRACKS_DIR / "orden.json"       # orden de emisión de las canciones
 STREAM_LOG = LOGS_DIR / "stream.log"
+STREAM_LOG_ANTERIOR = LOGS_DIR / "stream.log.1"   # registro de la emisión anterior (para analizar caídas)
 WATCHDOG_LOG = LOGS_DIR / "watchdog.log"
 PREVIEW_URL = os.environ.get("PREVIEW_RTMP", "rtmp://mediamtx:1935/radio")
+YOUTUBE_RTMP = os.environ.get("YOUTUBE_RTMP", "rtmp://a.rtmp.youtube.com/live2")   # cambiable solo para pruebas
+# Salidas del tee con cola propia (fifo) y reconexión automática ilimitada. Sin esto, un corte
+# silencioso de la red (la conexión TCP no da error, solo deja de avanzar) bloqueaba al codificador
+# entero: la vista previa se caía, YouTube daba la emisión por terminada y ffmpeg nunca reconectaba.
+# rw_timeout (por salida): una conexión o escritura que no avanza en 10 s es un error → el fifo
+# reconecta cada 2 s, para siempre, sin parar el codificador ni la otra salida. Comprobado con un
+# servidor RTMP pausado (docker pause): la previa sigue y al reanudar hay una publicación nueva.
+FIFO_OPTS = "attempt_recovery=1:drop_pkts_on_overflow=1:restart_with_keyframe=1:recovery_wait_time=2:max_recovery_attempts=0"
+RW_TIMEOUT = "rw_timeout=10000000"
 
 app = Flask(__name__, static_folder=None)
 app.config["MAX_CONTENT_LENGTH"] = 1024 ** 3  # subidas de hasta 1 GB
@@ -642,10 +652,10 @@ def start_stream(local=False):
             return "no hay pistas: genera música primero"
         if not local and not key:
             return "guarda la clave de emisión RTMP primero"
-        dest = None if local else f"rtmp://a.rtmp.youtube.com/live2/{key}"
+        dest = None if local else f"{YOUTUBE_RTMP}/{key}"
         # Una sola codificación repartida con «tee»: el destino principal y la copia
         # local. onfail=ignore: si la copia local falla, YouTube sigue sin cortes.
-        salidas = ([f"[f=flv]{dest}"] if dest else []) + [f"[f=flv:onfail=ignore]{PREVIEW_URL}"]
+        salidas = ([f"[f=flv:{RW_TIMEOUT}]{dest}"] if dest else []) + [f"[f=flv:onfail=ignore:{RW_TIMEOUT}]{PREVIEW_URL}"]
         # Audio: audiofeeder.py decodifica las canciones en el orden de la lista y en
         # bucle; anota la que suena y atiende «saltar». Video: videofeeder.py entrega
         # fotogramas en bruto de la cola por el descriptor 3. Ninguno de los dos
@@ -659,10 +669,11 @@ def start_stream(local=False):
                f'-f s16le -ar 44100 -ac 2 -i pipe:0 -map 0:v -map 1:a '
                f'-c:v libx264 -preset veryfast -b:v {kbps}k -maxrate {kbps}k '
                f'-bufsize {kbps * 2}k -g 60 -r 30 -c:a aac -b:a 160k -ar 44100 '
-               f'-flags +global_header -f tee "{"|".join(salidas)}"')
+               f'-flags +global_header -f tee -use_fifo 1 -fifo_options "{FIFO_OPTS}" "{"|".join(salidas)}"')
         if stream["log_fh"]:
             stream["log_fh"].close()
-        STREAM_LOG.write_text("")
+        if STREAM_LOG.exists() and STREAM_LOG.stat().st_size:
+            STREAM_LOG.replace(STREAM_LOG_ANTERIOR)   # se conserva el final de la emisión anterior
         fh = open(STREAM_LOG, "a")   # en modo «a»: la limpieza diaria puede vaciarlo sin romperlo
         cmd = f"{enc} 3< <({vfeeder}) < <({feeder}); kill 0"
         fh.write("$ " + cmd.replace(key or "~", "<clave>") + "\n")
@@ -720,7 +731,8 @@ def api_stream_stop():
 
 # --- vigilante 24/7: si la emisión debía estar activa y se ha caído (o se ha
 # quedado colgada sin avanzar), la relanza
-COLGADA_S = 90   # ffmpeg escribe progreso cada 5 s; 90 s sin hacerlo = colgada
+COLGADA_S = 90   # ffmpeg escribe progreso cada 5 s; 90 s sin hacerlo = colgada (último recurso:
+                 # las salidas ya reconectan solas gracias al fifo, ver FIFO_OPTS)
 
 
 def _anotar(texto):
@@ -805,7 +817,10 @@ def _cola_de_archivo(path, n=300, maximo=64_000):
 
 @app.get("/api/logs")
 def api_logs():
-    return jsonify(stream=_cola_de_archivo(STREAM_LOG), vigilante=_cola_de_archivo(WATCHDOG_LOG))
+    key = load_config().get("rtmp_key") or None
+    ocultar = lambda t: t.replace(key, "<clave>") if key else t   # ffmpeg imprime la URL con la clave
+    return jsonify(stream=ocultar(_cola_de_archivo(STREAM_LOG)), vigilante=_cola_de_archivo(WATCHDOG_LOG),
+                   anterior=ocultar(_cola_de_archivo(STREAM_LOG_ANTERIOR)))
 
 
 @app.get("/api/state")
