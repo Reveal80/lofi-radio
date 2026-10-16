@@ -1,0 +1,71 @@
+# Radio Lofi 24/7 — arranque con la imagen publicada en Docker Hub.
+# Un solo archivo: no hace falta descargar nada más.
+#
+#   mkdir radio-lofi && cd radio-lofi
+#   docker compose -f docker-compose.imagen.yml up -d
+#
+# Panel: http://IP:8080   ·   VLC: rtsp://IP:8554/radio
+# Variables opcionales: HTTP_PORT (8080) y PREVIEW_PORT (8554).
+# Música, videos y la clave de YouTube quedan en ./data; los registros en ./logs.
+
+services:
+  python:
+    image: therliss/lofi-radio:latest
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "1" }
+    volumes:
+      - ./data:/app/data   # música, videos y config.json (clave de YouTube)
+      - ./logs:/app/logs   # registros de la emisión
+    depends_on:
+      - mediamtx
+    expose:
+      - "8750"
+    restart: unless-stopped
+
+  mediamtx:
+    # servidor de streaming de la red local (VLC por RTSP, HLS para el panel)
+    image: bluenviron/mediamtx:1.9.3
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "1" }
+    environment:
+      MTX_HLSVARIANT: fmp4
+      MTX_HLSALWAYSREMUX: "yes"
+      MTX_HLSSEGMENTDURATION: 1s
+    ports:
+      - "${PREVIEW_PORT:-8554}:8554"
+    restart: unless-stopped
+
+  apache:
+    # proxy inverso: panel en / y directo HLS en /live/
+    image: php:8.3-apache
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "1" }
+    depends_on:
+      - python
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    configs:
+      - source: radio_conf
+        target: /etc/apache2/sites-available/000-default.conf
+    command: sh -c "a2enmod proxy proxy_http >/dev/null && exec apache2-foreground"
+    restart: unless-stopped
+
+configs:
+  radio_conf:
+    content: |
+      <VirtualHost *:80>
+          ServerName localhost
+          LimitRequestBody 0
+          ProxyTimeout 900
+          ProxyPreserveHost On
+          ProxyPass        /live/ http://mediamtx:8888/
+          ProxyPassReverse /live/ http://mediamtx:8888/
+          ProxyPass        / http://python:8750/
+          ProxyPassReverse / http://python:8750/
+          ErrorLog $${APACHE_LOG_DIR}/error.log
+          SetEnvIf Request_URI "^/(api/(state|logs)|live/)" sondeo
+          CustomLog $${APACHE_LOG_DIR}/access.log combined env=!sondeo
+      </VirtualHost>

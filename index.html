@@ -1,0 +1,1778 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radio Lofi 24/7</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg0: #07060f; --bg1: #110e24; --bg2: #1c1433;
+    --glass: rgba(255,255,255,.045); --glass-2: rgba(255,255,255,.07);
+    --stroke: rgba(255,255,255,.09); --stroke-2: rgba(255,255,255,.16);
+    --ink: #f3ecff; --muted: #9d93b8; --dim: #6c638a;
+    --amber: #ffb35c; --rose: #ff6f91; --violet: #9b7bff; --cyan: #5ce1e6;
+    --ok: #5ee6a0; --live: #ff4d6d;
+    --grad: linear-gradient(135deg, var(--amber), var(--rose) 55%, var(--violet));
+    --radius: 20px;
+    --sans: "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  html { background: var(--bg0); }
+  body {
+    margin: 0; color: var(--ink); font: 15px/1.5 var(--sans);
+    background: radial-gradient(120% 90% at 85% -10%, #2a1d52 0%, transparent 55%),
+                radial-gradient(80% 70% at -10% 110%, #3b1830 0%, transparent 55%),
+                linear-gradient(180deg, var(--bg1), var(--bg0));
+    display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: minmax(0, 1fr);
+    height: 100dvh; overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  #sky { position: fixed; inset: 0; z-index: -1; width: 100%; height: 100%; }
+  ::selection { background: var(--rose); color: #fff; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 99px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  /* ---------- barra superior ---------- */
+  .topbar {
+    position: relative; z-index: 30;
+    display: flex; align-items: center; gap: 14px; padding: 8px 20px; white-space: nowrap;
+    border-bottom: 1px solid var(--stroke);
+    background: rgba(10,8,22,.55); backdrop-filter: blur(18px);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .logo {
+    width: 30px; height: 30px; border-radius: 9px; background: var(--grad); flex: none;
+    display: grid; place-items: center; box-shadow: 0 4px 16px rgba(255,111,145,.35);
+  }
+  .logo svg { width: 17px; height: 17px; }
+  .brand h1 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+  .brand small { font: 500 10px var(--mono); color: var(--dim); letter-spacing: .14em; text-transform: uppercase; }
+  .stats { display: flex; gap: 8px; margin-left: auto; }
+  .stat {
+    display: flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 99px;
+    background: var(--glass); border: 1px solid var(--stroke); font-size: 13px; color: var(--muted);
+  }
+  .stat svg { width: 14px; height: 14px; flex: none; }
+  .stat b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .compose-wrap { position: relative; margin-left: auto; }
+  .pixa-wrap + .compose-wrap { margin-left: 0; }
+  #px-pop { width: 420px; }
+  .pxmark { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; align-items: center; margin-top: 10px;
+            padding: 10px 12px; border-radius: 12px; background: rgba(155,123,255,.08); border: 1px solid rgba(155,123,255,.3); }
+  .pxmark b { display: block; font-size: 12.5px; } .pxmark small { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  #px-mark { cursor: grab; white-space: nowrap; }
+  #px-chips .chip { cursor: pointer; } #px-chips .chip:hover { color: var(--ink); border-color: var(--stroke-2); }
+  .popover { position: absolute; top: calc(100% + 10px); right: 0; width: 380px; z-index: 40; padding: 18px; border-radius: 18px;
+             background: rgba(22,15,43,.97); border: 1px solid var(--stroke-2); box-shadow: 0 24px 60px rgba(0,0,0,.6);
+             backdrop-filter: blur(20px); white-space: normal; display: none; }
+  .popover.open { display: block; animation: pop .25s cubic-bezier(.2,.9,.3,1.2); }
+  .popover .genrow { grid-template-columns: 130px 1fr; }
+  .comp-tabs { margin-bottom: 14px; }
+  .comp-tabs .tab { flex: 1; }
+  .escenas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .escena { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px; border-radius: 11px;
+            font-size: 11.5px; color: var(--muted); background: rgba(0,0,0,.25); border: 1px solid var(--stroke); transition: all .15s; }
+  .escena .em { width: 22px; height: 22px; display: grid; place-items: center; }
+  .escena .em svg { width: 20px; height: 20px; }
+  .escena.on .em { color: var(--rose); }
+  .escena:hover { color: var(--ink); border-color: var(--stroke-2); }
+  .escena.on { color: var(--ink); border-color: rgba(255,111,145,.7); background: rgba(255,111,145,.12); }
+  .upwrap { position: relative; margin-left: auto; }
+  .upwrap + .search { margin-left: 8px; }
+  .uppop { left: auto; right: 0; width: 380px; }
+  .uppop .drop { margin: 0; }
+  #g-open.busy { color: var(--ink); border-color: rgba(255,111,145,.5); background: rgba(255,111,145,.1); }
+  #g-open.busy svg { color: var(--rose); animation: spin 2.4s linear infinite; }
+  .logbtn { display: flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 99px; font-size: 13px;
+            color: var(--muted); background: var(--glass); border: 1px solid var(--stroke); transition: all .2s; }
+  .logbtn svg { width: 14px; height: 14px; }
+  .logbtn:hover, .logbtn.on { color: var(--ink); border-color: var(--stroke-2); background: var(--glass-2); }
+  .logbtn .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
+  .logbtn .dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .clock { font: 700 13px var(--mono); color: var(--amber); font-variant-numeric: tabular-nums; letter-spacing: .04em;
+           padding: 5px 12px; border-radius: 99px; background: rgba(255,179,92,.1); border: 1px solid rgba(255,179,92,.35);
+           text-shadow: 0 0 12px rgba(255,179,92,.45); }
+
+  /* ---------- rejilla principal ---------- */
+  .grid {
+    display: grid; gap: 18px; padding: 18px 24px; min-height: 0;
+    grid-template-columns: minmax(0, 3.1fr) minmax(320px, 1.15fr);
+  }
+  .col { display: flex; flex-direction: column; gap: 18px; min-height: 0; min-width: 0; }
+  .card {
+    position: relative; background: var(--glass); border: 1px solid var(--stroke);
+    border-radius: var(--radius); padding: 20px; backdrop-filter: blur(22px);
+    box-shadow: 0 20px 50px -20px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.05);
+  }
+  .card-h { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .card-h h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
+  .card-h .num { font: 500 10px var(--mono); color: var(--dim); letter-spacing: .14em; }
+  .card-h .right { margin-left: auto; }
+  .hint { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+
+  /* ---------- botones e inputs ---------- */
+  button { font: inherit; cursor: pointer; border: none; color: inherit; background: none; }
+  button:disabled { opacity: .38; cursor: not-allowed; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 11px 18px; border-radius: 13px; font-weight: 600; font-size: 14px;
+    background: var(--glass-2); border: 1px solid var(--stroke-2);
+    transition: transform .15s, background .2s, box-shadow .2s, border-color .2s;
+  }
+  .btn svg { width: 16px; height: 16px; flex: none; }
+  .btn:not(:disabled):hover { background: rgba(255,255,255,.11); transform: translateY(-1px); }
+  .btn:not(:disabled):active { transform: translateY(0) scale(.98); }
+  .btn.primary { background: var(--grad); border-color: transparent; color: #1a0f20;
+                 box-shadow: 0 10px 30px -8px rgba(255,111,145,.55); }
+  .btn.primary:not(:disabled):hover { background: var(--grad); filter: brightness(1.08);
+                 box-shadow: 0 14px 36px -8px rgba(255,111,145,.7); }
+  .btn.live { background: linear-gradient(135deg, #ff4d6d, #ff7a59); border-color: transparent; color: #fff;
+              box-shadow: 0 10px 30px -8px rgba(255,77,109,.6); }
+  .btn.live:not(:disabled):hover { background: linear-gradient(135deg, #ff4d6d, #ff7a59); filter: brightness(1.1); }
+  .btn.block { width: 100%; }
+  .btn.sm { padding: 7px 12px; font-size: 12.5px; border-radius: 10px; }
+  .iconbtn { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center;
+             color: var(--muted); transition: all .2s; }
+  .iconbtn:hover { color: var(--ink); background: var(--glass-2); }
+  .iconbtn svg { width: 18px; height: 18px; }
+  .field {
+    display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 14px; border-radius: 13px;
+    background: rgba(0,0,0,.25); border: 1px solid var(--stroke); transition: border-color .2s, box-shadow .2s;
+  }
+  .field:focus-within { border-color: rgba(155,123,255,.6); box-shadow: 0 0 0 4px rgba(155,123,255,.12); }
+  .field input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--ink);
+                 font: 14px var(--sans); padding: 8px 0; }
+  .field input::placeholder { color: var(--dim); }
+
+  /* stepper */
+  .stepper { display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 14px;
+             background: rgba(0,0,0,.25); border: 1px solid var(--stroke); }
+  .stepper button { width: 38px; height: 38px; border-radius: 10px; font-size: 20px; color: var(--muted); }
+  .stepper button:hover { background: var(--glass-2); color: var(--ink); }
+  .stepper output { flex: 1; text-align: center; font-size: 26px; font-weight: 700;
+                    font-variant-numeric: tabular-nums; min-width: 48px; }
+  .genrow { display: grid; grid-template-columns: 140px 1fr; gap: 10px; }
+
+  .progress { height: 6px; border-radius: 99px; background: rgba(255,255,255,.07); overflow: hidden; }
+  .progress i { display: block; height: 100%; width: 0; background: var(--grad); border-radius: 99px;
+                transition: width .6s cubic-bezier(.2,.8,.2,1); }
+  .progress.indet i { width: 35% !important; animation: indet 1.3s ease-in-out infinite; }
+  @keyframes indet { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+  .status-line { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px;
+                 color: var(--muted); font: 11.5px var(--mono); min-height: 17px; }
+  .status-line span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .err { color: var(--rose); font-size: 12.5px; margin: 8px 0 0; }
+  .err:empty { display: none; }
+  .spinner { width: 34px; height: 34px; border-radius: 50%; margin: 0 auto 10px;
+             border: 3px solid rgba(255,255,255,.12); border-top-color: var(--rose); animation: spin .9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .drop {
+    margin-top: 12px; border: 1.5px dashed var(--stroke-2); border-radius: 14px; padding: 14px;
+    display: flex; align-items: center; gap: 12px; cursor: pointer; transition: all .2s;
+  }
+  .drop:hover, .drop.over { border-color: var(--violet); background: rgba(155,123,255,.08); }
+  .drop .ico { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center;
+               background: rgba(155,123,255,.15); color: var(--violet); flex: none; }
+  .drop .ico svg { width: 18px; height: 18px; }
+  .drop b { display: block; font-size: 13.5px; font-weight: 600; }
+  .drop small { color: var(--muted); font-size: 12px; display: block; overflow: hidden;
+                text-overflow: ellipsis; white-space: nowrap; }
+  .drop > div { min-width: 0; }
+
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px;
+          font: 500 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+          background: rgba(0,0,0,.45); border: 1px solid var(--stroke-2); color: var(--muted); }
+  .pill.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
+  .pill.warn { color: var(--amber); border-color: rgba(255,179,92,.45); background: rgba(255,179,92,.1); }
+
+  /* ---------- hero / reproductor central ---------- */
+  .hero { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.2fr); gap: 22px; align-items: center;
+          padding: 14px 22px; overflow: hidden; flex: none; }
+  .hero::before { content: ""; position: absolute; inset: -40%; z-index: -1; opacity: .5;
+                  background: radial-gradient(circle at 20% 50%, hsla(var(--h,330),90%,60%,.35), transparent 45%);
+                  transition: background 1s; }
+  .vinyl-wrap { position: relative; width: 86px; height: 86px; }
+  .vinyl {
+    width: 100%; height: 100%; border-radius: 50%; position: relative;
+    background: repeating-radial-gradient(circle, #111 0 2px, #1b1b1f 2px 4px);
+    box-shadow: 0 20px 50px rgba(0,0,0,.6), inset 0 0 0 2px rgba(255,255,255,.04);
+    animation: spin 3.2s linear infinite; animation-play-state: paused;
+  }
+  .vinyl::before { content: ""; position: absolute; inset: 0; border-radius: 50%;
+                   background: conic-gradient(from 30deg, transparent 0 40deg, rgba(255,255,255,.1) 60deg, transparent 80deg 220deg, rgba(255,255,255,.07) 240deg, transparent 260deg); }
+  .vinyl .label { position: absolute; inset: 33%; border-radius: 50%;
+                  background: linear-gradient(135deg, hsl(var(--h,330),85%,65%), hsl(calc(var(--h,330) + 60),80%,55%));
+                  display: grid; place-items: center; }
+  .vinyl .label::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--bg0); }
+  .playing .vinyl { animation-play-state: running; }
+  .hero-info { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .eyebrow { font: 500 10.5px var(--mono); letter-spacing: .22em; text-transform: uppercase; color: var(--amber); }
+  .hero-title { margin: 0; font-size: clamp(18px, 1.6vw, 26px); font-weight: 800; letter-spacing: -.02em;
+                line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { font: 500 11px var(--mono); padding: 3px 9px; border-radius: 8px; background: var(--glass-2);
+          border: 1px solid var(--stroke); color: var(--muted); }
+  #viz { width: 100%; height: 70px; display: block; }
+
+  /* ---------- lista de pistas ---------- */
+  .tracks-card { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 20px 10px 10px; }
+  .tracks-card .card-h { padding: 0 10px; }
+  .search { width: 220px; }
+  .search input { padding: 6px 0; font-size: 13px; }
+  .thead, .track { display: grid; grid-template-columns: 14px 44px minmax(0,1fr) minmax(0,max-content) 64px 40px;
+                   gap: 12px; align-items: center; padding: 0 12px; }
+  .thead { font: 500 10px var(--mono); letter-spacing: .16em; color: var(--dim); text-transform: uppercase;
+           padding-bottom: 10px; border-bottom: 1px solid var(--stroke); margin: 0 6px; }
+  .tracklist { overflow-y: auto; flex: 1; padding: 6px; }
+  .track { height: 58px; border-radius: 13px; cursor: pointer; position: relative; transition: background .15s;
+           animation: rowin .4s both; }
+  @keyframes rowin { from { opacity: 0; transform: translateY(6px); } }
+  .track:hover { background: rgba(255,255,255,.05); }
+  .track.activo { background: linear-gradient(90deg, rgba(255,111,145,.14), rgba(155,123,255,.06)); }
+  .track .idx { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px;
+                background: linear-gradient(135deg, hsl(var(--h),80%,62%), hsl(calc(var(--h) + 60),75%,50%));
+                color: rgba(0,0,0,.65); font-weight: 700; font-size: 13px; position: relative; overflow: hidden; }
+  .track .idx .pp { display: none; }
+  .track:hover .idx .n, .track.activo .idx .n { display: none; }
+  .track:hover .idx .pp, .track.activo .idx .pp { display: block; }
+  .idx svg { width: 16px; height: 16px; color: #140b18; }
+  .eq { display: none; gap: 2px; align-items: flex-end; height: 14px; }
+  .track.activo.sonando .idx .pp { display: none; }
+  .track.activo.sonando .eq { display: flex; }
+  .track.activo.sonando:hover .eq { display: none; }
+  .track.activo.sonando:hover .idx .pp { display: block; }
+  .eq i { width: 3px; background: #140b18; border-radius: 2px; animation: eq 1s ease-in-out infinite; }
+  .eq i:nth-child(2) { animation-delay: -.3s; } .eq i:nth-child(3) { animation-delay: -.6s; }
+  @keyframes eq { 0%,100% { height: 4px; } 50% { height: 14px; } }
+  .ttitle { font-weight: 600; font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .track.activo .ttitle { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .tsub { font: 11px var(--mono); color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ttema { font: 11.5px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+  .tdur { font: 12px var(--mono); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+  .tdel { opacity: 0; }
+  .track:hover .tdel { opacity: 1; }
+  .tdel:hover { color: var(--rose) !important; background: rgba(255,111,145,.12) !important; }
+  .track .mini { position: absolute; left: 12px; right: 12px; bottom: 4px; height: 2px; border-radius: 2px;
+                 background: rgba(255,255,255,.06); overflow: hidden; display: none; }
+  .track.activo .mini { display: block; }
+  .track .mini i { display: block; height: 100%; width: 0; background: var(--grad); }
+  .emptystate { flex: 1; display: grid; place-items: center; text-align: center; color: var(--muted); padding: 30px; }
+  .emptystate .big { font-size: 46px; margin-bottom: 4px; filter: grayscale(.2); }
+
+  /* ---------- emisión ---------- */
+  .stream-card { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: none; }
+  .stream-card::-webkit-scrollbar { display: none; }
+  .stream-card > * { flex-shrink: 0; }
+  .broadcast {
+    border-radius: 16px; padding: 18px; margin-bottom: 16px; text-align: center;
+    background: rgba(0,0,0,.28); border: 1px solid var(--stroke); position: relative; overflow: hidden;
+  }
+  .broadcast .big { font-size: 22px; font-weight: 800; letter-spacing: .04em; }
+  .broadcast .sub { color: var(--muted); font: 11.5px var(--mono); margin-top: 2px; }
+  .broadcast .rings { width: 64px; height: 64px; margin: 0 auto 10px; position: relative; display: grid; place-items: center; }
+  .broadcast .rings svg { width: 28px; height: 28px; color: var(--dim); position: relative; z-index: 1; }
+  .broadcast .rings::before, .broadcast .rings::after { content: ""; position: absolute; inset: 0; border-radius: 50%;
+        border: 2px solid var(--dim); opacity: .3; }
+  .broadcast.live { border-color: rgba(255,77,109,.5); background: radial-gradient(circle at 50% 0, rgba(255,77,109,.25), rgba(0,0,0,.3) 70%); }
+  .broadcast.live .rings svg { color: var(--live); }
+  .broadcast.live .rings::before, .broadcast.live .rings::after { border-color: var(--live); animation: ring 2s ease-out infinite; }
+  .broadcast.live .rings::after { animation-delay: 1s; }
+  .broadcast.test { border-color: rgba(255,179,92,.45); background: radial-gradient(circle at 50% 0, rgba(255,179,92,.18), rgba(0,0,0,.3) 70%); }
+  .broadcast.test .rings svg { color: var(--amber); }
+  .broadcast.test .rings::before, .broadcast.test .rings::after { border-color: var(--amber); animation: ring 2s ease-out infinite; }
+  @keyframes ring { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(1.5); opacity: 0; } }
+  .watch { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 12px; border-radius: 13px;
+           background: rgba(0,0,0,.2); border: 1px solid var(--stroke); font-size: 12.5px; color: var(--muted); }
+  .watch svg { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+  .watch.on { border-color: rgba(94,230,160,.3); color: #c9f5dd; }
+  .watch.on svg { color: var(--ok); }
+  .terminal { flex: 1; min-height: 0; display: flex; flex-direction: column;
+              border-radius: 13px; overflow: hidden; border: 1px solid var(--stroke); background: #05040b; }
+  .terminal .bar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: rgba(255,255,255,.04);
+                   border-bottom: 1px solid var(--stroke); font: 10.5px var(--mono); color: var(--dim); letter-spacing: .1em; }
+  .terminal .bar i { width: 9px; height: 9px; border-radius: 50%; background: #2c2840; }
+  .terminal .bar i:nth-child(1) { background: #ff5f57; } .terminal .bar i:nth-child(2) { background: #febc2e; }
+  .terminal .bar i:nth-child(3) { background: #28c840; margin-right: 6px; }
+  .terminal pre { margin: 0; padding: 12px; flex: 1; overflow: auto; font: 11px/1.6 var(--mono);
+                  color: #b7f5c8; white-space: pre-wrap; word-break: break-all; }
+
+  /* ---------- barra del reproductor ---------- */
+  .playerbar {
+    display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.6fr) minmax(0,1fr); gap: 24px; align-items: center;
+    padding: 12px 24px; border-top: 1px solid var(--stroke);
+    background: rgba(10,8,22,.75); backdrop-filter: blur(20px);
+  }
+  .pb-now { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .pb-cover { width: 48px; height: 48px; border-radius: 12px; flex: none;
+              background: linear-gradient(135deg, hsl(var(--h,260),80%,62%), hsl(calc(var(--h,260) + 60),75%,50%));
+              box-shadow: 0 8px 20px -6px hsla(var(--h,260),80%,60%,.6); }
+  .pb-now div { min-width: 0; }
+  .pb-now b { display: block; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pb-now small { color: var(--muted); font: 11px var(--mono); display: block; overflow: hidden;
+                  text-overflow: ellipsis; white-space: nowrap; }
+  .pb-center { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  .pb-ctrl { display: flex; align-items: center; gap: 14px; }
+  .pb-play { width: 44px; height: 44px; border-radius: 50%; background: var(--ink); color: var(--bg0);
+             display: grid; place-items: center; transition: transform .15s; }
+  .pb-play:hover { transform: scale(1.07); }
+  .pb-play svg { width: 18px; height: 18px; }
+  .pb-seek { display: flex; align-items: center; gap: 10px; width: 100%; font: 11px var(--mono); color: var(--muted);
+             font-variant-numeric: tabular-nums; }
+  .pb-right { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+  input[type=range] { -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; flex: 1;
+                      height: 16px; --p: 0%; }
+  input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 99px;
+     background: linear-gradient(90deg, var(--rose) 0, var(--amber) var(--p), rgba(255,255,255,.12) var(--p)); }
+  input[type=range]::-moz-range-track { height: 4px; border-radius: 99px; background: rgba(255,255,255,.12); }
+  input[type=range]::-moz-range-progress { height: 4px; border-radius: 99px; background: linear-gradient(90deg, var(--rose), var(--amber)); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
+     background: #fff; margin-top: -4px; box-shadow: 0 0 0 4px rgba(255,111,145,.25); opacity: 0; transition: opacity .2s; }
+  input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border: none; border-radius: 50%; background: #fff; }
+  input[type=range]:hover::-webkit-slider-thumb { opacity: 1; }
+  #vol { max-width: 110px; }
+
+  /* ---------- toasts y modal ---------- */
+  .toasts { position: fixed; top: 80px; right: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
+  .toast { padding: 12px 16px; border-radius: 13px; background: rgba(28,20,51,.92); border: 1px solid var(--stroke-2);
+           backdrop-filter: blur(16px); box-shadow: 0 16px 40px rgba(0,0,0,.5); font-size: 13.5px; max-width: 340px;
+           display: flex; gap: 10px; align-items: center; animation: tin .35s cubic-bezier(.2,.9,.3,1.2); }
+  .toast::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; }
+  .toast.bad::before { background: var(--rose); }
+  .toast.out { animation: tout .3s forwards; }
+  @keyframes tin { from { opacity: 0; transform: translateX(30px); } }
+  @keyframes tout { to { opacity: 0; transform: translateX(30px); } }
+  .modal { position: fixed; inset: 0; z-index: 60; display: none; place-items: center; padding: 16px;
+           background: rgba(4,3,10,.6); backdrop-filter: blur(8px); }
+  .modal.open { display: grid; animation: fade .2s; }
+  @keyframes fade { from { opacity: 0; } }
+  .modal .box { width: min(420px, 100%); padding: 26px; border-radius: 22px; background: #160f2b;
+                border: 1px solid var(--stroke-2); box-shadow: 0 30px 80px rgba(0,0,0,.6); animation: pop .3s cubic-bezier(.2,.9,.3,1.2); }
+  @keyframes pop { from { transform: scale(.92); opacity: 0; } }
+  .modal h3 { margin: 0 0 6px; font-size: 19px; }
+  .modal p { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+  .modal .acts { display: flex; gap: 10px; justify-content: flex-end; }
+  .qprog { height: 3px; border-radius: 3px; background: rgba(255,255,255,.08); margin-top: 5px; overflow: hidden; display: none; }
+  .qprog i { display: block; height: 100%; width: 0; background: var(--grad); }
+  .qctl { grid-column: 3; display: flex; align-items: center; gap: 2px; }
+  .hours { display: flex; align-items: center; gap: 4px; padding: 3px 8px 3px 4px; border-radius: 9px;
+           background: rgba(0,0,0,.3); border: 1px solid var(--stroke); margin-right: 4px; }
+  .hours:focus-within { border-color: rgba(155,123,255,.6); }
+  .hours input { width: 46px; background: none; border: none; outline: none; color: var(--ink);
+                 font: 600 13px var(--mono); text-align: right; }
+  .hours span { font: 11px var(--mono); color: var(--dim); }
+  .hours.tiempo { gap: 2px; padding: 2px 10px 2px 4px; }
+  .hours.tiempo input { width: 34px; padding: 4px 2px; text-align: center; border-radius: 6px; -moz-appearance: textfield; appearance: textfield; }
+  .hours.tiempo input:hover, .hours.tiempo input:focus { background: rgba(255,255,255,.08); }
+  .hours.tiempo input::-webkit-inner-spin-button, .hours.tiempo input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .hours.tiempo span { margin-right: 4px; }
+  .qctl .iconbtn { width: 26px; height: 26px; border-radius: 8px; }
+  .qctl .iconbtn svg { width: 14px; height: 14px; }
+  .qctl .qdel:hover { color: var(--rose); background: rgba(255,111,145,.12); }
+
+  /* ---------- pestañas de la biblioteca ---------- */
+  .tabs { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: rgba(0,0,0,.25); border: 1px solid var(--stroke); }
+  .tab { padding: 6px 14px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--muted); transition: all .2s; }
+  .tab span { font: 11px var(--mono); color: var(--dim); margin-left: 4px; }
+  .tab:hover { color: var(--ink); }
+  .tab.on { background: var(--glass-2); color: var(--ink); box-shadow: inset 0 0 0 1px var(--stroke-2); }
+  .tab.on span { color: var(--rose); }
+  .tabpane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  [hidden] { display: none !important; }
+
+  /* ---------- música: canción del directo ---------- */
+  .mtools { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; padding: 0 10px 12px; }
+  .mlive { position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 14px; overflow: hidden;
+           background: rgba(0,0,0,.25); border: 1px solid var(--stroke); }
+  .mlive.on { border-color: rgba(255,77,109,.45); background: linear-gradient(90deg, rgba(255,77,109,.14), rgba(0,0,0,.2) 70%); }
+  .mlive .pill { flex: none; }
+  .mlive:not(.on) .pill { color: var(--dim); background: rgba(0,0,0,.3); border-color: var(--stroke-2); }
+  .mlive-txt { min-width: 0; }
+  .mlive-txt b { display: block; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mlive-txt small { display: block; font: 11px var(--mono); color: var(--muted); }
+  .mlive .qprog { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; margin: 0; border-radius: 0; display: none; }
+  .mlive.on .qprog { display: block; }
+  .track.busyrow { cursor: default; background: rgba(155,123,255,.07); outline: 1px dashed rgba(155,123,255,.4); outline-offset: -1px; }
+  .track .ttl { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .track .ttl .ttitle { min-width: 0; }
+  .track .ldot { flex: none; font: 600 9.5px var(--mono); letter-spacing: .08em; padding: 2px 7px; border-radius: 99px;
+                 color: #fff; background: var(--live); }
+  .track.endirecto { box-shadow: inset 3px 0 0 var(--live); }
+  .track.endirecto .tsub { color: var(--rose); }
+  .track .vedit { opacity: 0; } .track:hover .vedit { opacity: .8; }
+  .pb-tag { display: inline-block; font: 600 9px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--cyan);
+            border: 1px solid rgba(92,225,230,.4); border-radius: 99px; padding: 1px 7px; margin-bottom: 3px; }
+  .vinfo-line { margin: 0 16px 10px; }
+  .vinfo-line span:first-child { white-space: normal; }
+  .vinfo-line b { color: var(--ink); font-weight: 600; }
+  .vgridcols, .vitem { display: grid; grid-template-columns: 14px 40px 72px minmax(0,1fr) 76px 150px 52px 40px; gap: 12px; align-items: center; padding: 0 12px; }
+  .vitem { min-height: 64px; border-radius: 13px; position: relative; transition: background .15s, opacity .2s; animation: rowin .4s both; }
+  .vitem:hover { background: rgba(255,255,255,.05); }
+  .vitem.off .vthumb2, .vitem.off .vname { opacity: .45; }
+  .vitem.off .vname:focus-within { opacity: 1; }
+  .vitem.emitiendo { background: linear-gradient(90deg, rgba(255,111,145,.14), rgba(155,123,255,.06)); box-shadow: inset 3px 0 0 var(--live); }
+  .vtitle .ldot { flex: none; font: 600 9.5px var(--mono); letter-spacing: .08em; padding: 2px 7px; border-radius: 99px; color: #fff; background: var(--live); }
+  .vpos { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; font: 600 12px var(--mono);
+          color: var(--muted); background: rgba(255,255,255,.06); transition: all .2s; }
+  .vpos svg { width: 15px; height: 15px; display: none; }
+  .vitem:hover .vpos { background: var(--ink); color: var(--bg0); }
+  .vitem:hover .vpos svg { display: block; } .vitem:hover .vpos .n { display: none; }
+  .vitem.emitiendo .vpos { background: var(--live); color: #fff; }
+  .vthumb2 { width: 72px; height: 40px; border-radius: 8px; object-fit: cover; background: #000; display: block; cursor: pointer; }
+  .vname { min-width: 0; }
+  .vtitle { display: flex; align-items: center; gap: 4px; min-width: 0; }
+  .vtitle b { min-width: 0; }
+  .vedit { width: 24px; height: 24px; border-radius: 7px; flex: none; opacity: 0; }
+  .vedit svg { width: 13px; height: 13px; }
+  .vitem:hover .vedit { opacity: .8; } .vedit:hover { opacity: 1 !important; }
+  .vrename { width: 100%; max-width: 420px; font: 600 14px var(--sans); color: var(--ink); background: rgba(0,0,0,.4);
+             border: 1px solid rgba(155,123,255,.7); border-radius: 8px; padding: 4px 8px; outline: none;
+             box-shadow: 0 0 0 3px rgba(155,123,255,.18); }
+  .vname b { display: block; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vname small { display: block; font: 11px var(--mono); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vitem.emitiendo .vname small { color: var(--rose); }
+  .vitem .qprog { display: none; position: absolute; left: 12px; right: 12px; bottom: 4px; height: 2px; margin: 0; }
+  .vitem.emitiendo .qprog { display: block; }
+  .switch { position: relative; width: 42px; height: 24px; display: inline-block; cursor: pointer; }
+  .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .switch span { position: absolute; inset: 0; border-radius: 99px; background: rgba(255,255,255,.12); transition: background .2s; }
+  .switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%;
+                        background: #fff; transition: transform .2s cubic-bezier(.2,.9,.3,1.2); box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+  .switch input:checked + span { background: linear-gradient(135deg, var(--rose), var(--violet)); }
+  .switch input:checked + span::after { transform: translateX(18px); }
+  .switch input:focus-visible + span { box-shadow: 0 0 0 3px rgba(155,123,255,.4); }
+  .vitem .hours { margin: 0; justify-self: start; }
+  .vitem.off .hours { opacity: .45; }
+  .vitem .qctl { grid-column: auto; justify-content: flex-end; }
+  .vitem .qctl .iconbtn { opacity: .55; } .vitem:hover .qctl .iconbtn:not(:disabled) { opacity: 1; }
+  .vitem[data-i] { cursor: grab; }
+  .track[data-name] { cursor: grab; }
+  .track .grip { color: var(--dim); display: grid; place-items: center; opacity: .5; touch-action: none; }
+  .track .grip svg { width: 10px; height: 16px; }
+  .track:hover .grip { opacity: 1; color: var(--muted); }
+  .track.hueco { background: rgba(155,123,255,.08) !important; outline: 1.5px dashed rgba(155,123,255,.55); outline-offset: -2px; }
+  .track.hueco > * { visibility: hidden; }
+  .track.fantasma { position: fixed; z-index: 70; pointer-events: none; animation: none; background: rgba(30,22,58,.97) !important;
+                    box-shadow: 0 18px 50px rgba(0,0,0,.6), 0 0 0 1px rgba(255,111,145,.5); transform: scale(1.02) rotate(-.4deg); }
+  .vitem .grip { color: var(--dim); display: grid; place-items: center; opacity: .5; transition: opacity .2s; touch-action: none; }
+  .vitem .grip svg { width: 10px; height: 16px; }
+  .vitem:hover .grip { opacity: 1; color: var(--muted); }
+  .vitem.hueco { background: rgba(155,123,255,.08) !important; outline: 1.5px dashed rgba(155,123,255,.55); outline-offset: -2px; }
+  .vitem.hueco > * { visibility: hidden; }
+  .vitem.fantasma { position: fixed; z-index: 70; pointer-events: none; cursor: grabbing; animation: none;
+                    background: rgba(30,22,58,.97) !important; box-shadow: 0 18px 50px rgba(0,0,0,.6), 0 0 0 1px rgba(255,111,145,.5);
+                    transform: scale(1.02) rotate(-.4deg); }
+  body.arrastrando, body.arrastrando * { cursor: grabbing !important; user-select: none; }
+  .vitem.busy { cursor: default; background: rgba(155,123,255,.07); border: 1px dashed rgba(155,123,255,.4); margin-bottom: 4px; }
+  .vitem.busy .vthumb2 { display: grid; place-items: center; background: rgba(0,0,0,.35); cursor: default; }
+  .vitem.busy .vname { grid-column: 4 / -1; }
+  .vitem.busy .vname b { color: var(--ink); }
+  .vitem.busy .vname small { color: var(--muted); }
+  .vitem.busy .qprog { display: block; }
+  .vitem.busy .qprog.indet i { width: 30% !important; animation: indet 1.4s ease-in-out infinite; }
+
+  /* ---------- reproductor del directo ---------- */
+  .broadcast.conplayer { padding: 0; }
+  .liveplayer { position: relative; aspect-ratio: 16/9; background: #000; }
+  .liveplayer video { width: 100%; height: 100%; display: block; object-fit: contain; }
+  .liveplayer .badge { position: absolute; top: 10px; left: 10px; }
+  .liveplayer .lp-ctrls { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 6px; }
+  .liveplayer .lp-ctrls .iconbtn { background: rgba(0,0,0,.6); color: #fff; backdrop-filter: blur(6px); }
+  .liveplayer .lp-ctrls .iconbtn:hover { background: rgba(0,0,0,.85); }
+  .lp-vol { display: flex; align-items: center; gap: 4px; padding-right: 10px; border-radius: 11px;
+            background: rgba(0,0,0,.6); backdrop-filter: blur(6px); }
+  .lp-vol .iconbtn { background: none !important; }
+  .lp-vol input { width: 90px; flex: none; }
+  .liveplayer .lp-wait { position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+                         font: 12px var(--mono); color: var(--muted); background: rgba(7,6,15,.75); }
+  .lp-info { display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-size: 12.5px; color: var(--muted);
+             border-top: 1px solid var(--stroke); text-align: left; }
+  .lp-info b { color: var(--ink); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .lp-info .right { margin-left: auto; font: 11px var(--mono); white-space: nowrap; }
+  .lp-info .lp-left { font: 11px var(--mono); white-space: nowrap; }
+  .lp-uptime { color: var(--rose); font-weight: 600 !important; }
+  .lp-uptime:not(:empty)::after { content: "·"; margin-left: 8px; color: var(--dim); }
+  .liveplayer .pill.warn { color: #1a0f20; background: rgba(255,179,92,.92); border-color: transparent; }
+  .pill.live { color: #fff; border-color: rgba(255,77,109,.7); background: rgba(255,77,109,.85); }
+
+  .btnpair { display: grid; grid-template-columns: 1.5fr 1fr; gap: 10px; margin-top: 10px; }
+  .btnpair .btn { padding: 13px 10px; }
+  .vlcline { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 9px 12px; border-radius: 12px;
+             background: rgba(0,0,0,.2); border: 1px solid var(--stroke); font-size: 12px; color: var(--muted); }
+  .vlcline b { font: 12px var(--mono); color: var(--ink); user-select: all; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vlcline .iconbtn { width: 26px; height: 26px; margin-left: auto; flex: none; }
+  .vlcline .iconbtn svg { width: 14px; height: 14px; }
+  .stream-card .watch { margin-top: 10px; padding: 10px 12px; font-size: 12px; }
+
+  /* ---------- panel de logs ---------- */
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(760px, 100%); z-index: 55; display: flex; flex-direction: column;
+            gap: 12px; padding: 18px; background: rgba(14,10,30,.96); border-left: 1px solid var(--stroke-2);
+            box-shadow: -30px 0 80px rgba(0,0,0,.6); backdrop-filter: blur(20px);
+            transform: translateX(105%); transition: transform .35s cubic-bezier(.2,.8,.2,1); }
+  .drawer.open { transform: none; }
+  .drawer-h { display: flex; align-items: center; gap: 12px; }
+  .drawer-h h2 { margin: 0; font-size: 16px; }
+  .drawer-h .right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+  .drawer .terminal { flex: 1; }
+  .drawer .terminal pre { font-size: 11.5px; }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 1280px) {
+    .grid { grid-template-columns: minmax(0, 1fr); }
+    .col.right { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; }
+    body { height: auto; min-height: 100dvh; overflow: auto; }
+    .tracks-card { min-height: 420px; }
+    .playerbar { position: sticky; bottom: 0; z-index: 10; }
+  }
+  @media (max-width: 860px) {
+    .grid { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+    .genrow { grid-template-columns: 120px minmax(0,1fr); }
+    .col.right { display: flex; }
+    .topbar { padding: 8px 12px; gap: 8px; }
+    .brand small, .clock, .stat .lbl { display: none; }
+    .stat { padding: 5px 9px; }
+    .vinyl-wrap { width: 86px; height: 86px; }
+    .thead { display: none; }
+    .track { grid-template-columns: 14px 44px minmax(0,1fr) 54px 40px; }
+    .track .ttema { display: none; }
+    .hero { grid-template-columns: auto minmax(0,1fr); } #viz { grid-column: 1 / -1; }
+    .vgridcols { display: none; }
+    .vitem { grid-template-columns: 14px 40px 64px minmax(0,1fr) 48px; row-gap: 6px; padding: 8px 12px; }
+    .vitem .hours, .vitem .tdur { display: none; }
+    .vitem .qctl { grid-column: 3 / -1; }
+    .tdel { opacity: 1; }
+    .search { width: 140px; }
+    .playerbar { grid-template-columns: 1fr auto; padding: 10px 16px; gap: 12px; }
+    .pb-center { grid-column: 1 / -1; grid-row: 2; }
+    .pb-right #vol, .pb-right .vicon { display: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas>
+
+<!-- ============ barra superior ============ -->
+<header class="topbar">
+  <div class="brand">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#1a0f20" stroke-width="2.2" stroke-linecap="round"><path d="M4 12a8 8 0 0 1 16 0"/><path d="M8 12a4 4 0 0 1 8 0"/><circle cx="12" cy="12" r="1.2" fill="#1a0f20"/><path d="M12 13v7"/></svg></div>
+    <h1>Radio Lofi 24/7</h1><small>panel de gestión</small>
+  </div>
+  <div class="compose-wrap pixa-wrap" id="px-wrap">
+    <button class="logbtn" id="px-open" onclick="abrirPixabay(event)" title="buscar música en Pixabay e importarla">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M9 13V8l4-1v5"/></svg>Pixabay
+    </button>
+    <div class="popover" id="px-pop">
+      <div class="card-h"><h2>Música de Pixabay</h2></div>
+      <p class="hint">Busca y escucha en Pixabay (se abre en otra pestaña). Cuando una te guste, impórtala aquí.</p>
+      <form class="field" onsubmit="buscarPixabay(event)">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--dim)" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="px-q" placeholder="lofi, chill, piano, lluvia…" autocomplete="off">
+        <button class="btn sm" type="submit">Buscar</button>
+      </form>
+      <div class="chips" style="margin-top:10px" id="px-chips"></div>
+      <div class="card-h" style="margin:18px 0 8px"><h2 style="font-size:13.5px">Importar a tu biblioteca</h2></div>
+      <form class="field" onsubmit="importarPixabay(event)">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--dim)" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
+        <input id="px-url" placeholder="https://cdn.pixabay.com/audio/…mp3" autocomplete="off">
+        <button class="btn sm primary" type="submit" id="px-imp">Importar</button>
+      </form>
+      <div class="pxmark">
+        <div><b>Importar con un clic desde Pixabay</b>
+          <small>1) Arrastra este botón a tu barra de marcadores. 2) En la página de una canción de Pixabay, pulsa el marcador: la canción se importa sola.</small></div>
+        <a class="btn sm primary" id="px-mark" href="#" onclick="event.preventDefault(); toast('Arrástralo a la barra de marcadores (no hace falta pulsarlo aquí)')">⤓ Importar a Radio Lofi</a>
+      </div>
+      <label class="drop" id="px-drop" style="margin-top:10px">
+        <input type="file" accept="audio/*,.mp3" hidden id="px-file">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></div>
+        <div><b>…o arrastra aquí el MP3 descargado</b><small>se añade al final de Música</small></div>
+      </label>
+      <p class="hint" style="margin:10px 0 0; font-size:11.5px">Licencia de Pixabay: uso libre, también en directos. Algunas canciones pueden recibir avisos de Content ID en YouTube.</p>
+      <p class="err" id="px-err"></p>
+    </div>
+  </div>
+  <div class="compose-wrap">
+    <button class="logbtn" id="g-open" onclick="abrirComponer(event)" title="componer canciones nuevas">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z"/><path d="M19 17v4M17 19h4"/></svg><span id="g-openlbl">Componer</span>
+    </button>
+    <div class="popover" id="g-pop">
+      <div class="tabs comp-tabs">
+        <button class="tab on" data-comp="musica" onclick="verComp('musica')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:6px"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Música</button>
+        <button class="tab" data-comp="video" onclick="verComp('video')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:6px"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg>Video</button>
+      </div>
+      <div id="comp-musica">
+        <p class="hint">Elige un estilo: marca el tempo, los instrumentos y el ritmo. Dentro de él, cada canción nace desde cero.</p>
+        <div class="escenas" id="m-estilos" style="margin-bottom:12px"></div>
+        <div class="genrow">
+          <div class="stepper">
+            <button onclick="step(-1)" aria-label="menos">−</button>
+            <output id="g-count">3</output>
+            <button onclick="step(1)" aria-label="más">+</button>
+          </div>
+          <button id="g-btn" class="btn primary" onclick="generar()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z"/><path d="M19 17v4M17 19h4"/></svg>
+            Componer
+          </button>
+        </div>
+        <div class="progress" id="g-prog" style="margin-top:16px"><i></i></div>
+        <div class="status-line"><span id="g-status"></span><span id="g-frac"></span></div>
+        <p id="g-err" class="err"></p>
+      </div>
+      <div id="comp-video" hidden>
+        <p class="hint">Escenas de ciudad de 20 s que se repiten sin saltos. Cada video sale distinto. La lluvia y la nieve caen animadas.</p>
+        <div class="escenas" id="e-tipos"></div>
+        <div class="genrow" style="margin-top:12px">
+          <div class="stepper">
+            <button onclick="stepE(-1)" aria-label="menos">−</button>
+            <output id="e-count">1</output>
+            <button onclick="stepE(1)" aria-label="más">+</button>
+          </div>
+          <button id="v-btn" class="btn primary" onclick="genVideo()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg>
+            Crear videos
+          </button>
+        </div>
+        <div class="progress" id="e-prog" style="margin-top:16px"><i></i></div>
+        <div class="status-line"><span id="e-status"></span><span id="e-frac"></span></div>
+        <p id="e-err" class="err"></p>
+      </div>
+    </div>
+  </div>
+  <div class="stats" style="margin-left:0">
+    <div class="stat"><svg viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><b id="st-tracks">–</b><span class="lbl">pistas</span></div>
+    <div class="stat"><svg viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><b id="st-mins">–</b><span class="lbl">min</span></div>
+  </div>
+  <button class="logbtn" id="logbtn" onclick="abrirLogs()" title="ver los registros de la emisión">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-5-6-5M12 19h8"/></svg>Logs<span class="dot" id="logdot"></span>
+  </button>
+  <div class="clock" id="clock">--:--:--</div>
+</header>
+
+<!-- ============ rejilla ============ -->
+<main class="grid">
+
+  <!-- principal: escucha y bibliotecas -->
+  <div class="col">
+    <section class="card hero" id="hero">
+      <div class="vinyl-wrap"><div class="vinyl"><div class="label"></div></div></div>
+      <div class="hero-info">
+        <span class="eyebrow" id="h-eyebrow">selecciona una pista</span>
+        <h2 class="hero-title" id="h-title">Música para no hacer nada</h2>
+        <div class="chips" id="h-chips"><span class="chip">lofi</span><span class="chip">hip-hop</span><span class="chip">24/7</span></div>
+      </div>
+      <canvas id="viz"></canvas>
+    </section>
+
+    <section class="card tracks-card">
+      <div class="card-h">
+        <span class="num">03</span><h2>Biblioteca</h2>
+        <div class="tabs" role="tablist">
+          <button class="tab on" data-tab="videos" onclick="verTab('videos')">Videos<span id="n-vid">0</span></button>
+          <button class="tab" data-tab="musica" onclick="verTab('musica')">Música<span id="n-mus">0</span></button>
+        </div>
+        <div class="upwrap" id="up-wrap">
+          <button class="btn sm" id="up-open" onclick="abrirSubida(event)" title="subir música o videos a la biblioteca">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>Subir
+          </button>
+          <div class="popover uppop" id="up-pop">
+            <div class="card-h"><h2>Subir a la biblioteca</h2></div>
+            <label class="drop" id="v-drop">
+              <input id="v-file" type="file" accept="audio/*,video/*,.mp3,.wav,.flac,.m4a,.ogg,.mkv" hidden>
+              <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></div>
+              <div><b>Elige o arrastra música o un video</b><small id="v-fname">mp3, wav, m4a… → Música · mp4, mov, mkv… → Videos</small></div>
+            </label>
+            <div class="progress" id="v-upprog" style="display:none; margin-top:12px"><i></i></div>
+            <p class="hint" style="margin:10px 0 0; font-size:12px">Se detecta solo: el audio va a <b>Música</b> (entra en el directo al azar) y los videos a <b>Videos</b>, desactivados hasta que actives «en bucle».</p>
+          </div>
+        </div>
+        <div class="field search">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--dim)" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="q" placeholder="Buscar video…" oninput="filtrar()">
+        </div>
+      </div>
+      <div class="tabpane" id="pane-musica" hidden>
+        <div class="mtools">
+          <div class="mlive" id="m-live">
+            <span class="pill live" id="m-live-pill">● EN DIRECTO</span>
+            <div class="mlive-txt"><b id="m-live-t">La emisión está parada</b><small id="m-live-r">la música del directo aparecerá aquí</small></div>
+            <div class="qprog"><i id="m-live-bar"></i></div>
+          </div>
+          <button class="btn" id="m-skip" onclick="saltarCancion()" title="Pasa a otra canción en el directo sin cortar la emisión">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg>Siguiente canción
+          </button>
+        </div>
+        <div class="thead"><span></span><span>#</span><span>título</span><span style="text-align:center; position:relative; left:-50px">tema</span><span style="text-align:right">dur.</span><span></span></div>
+        <div class="tracklist" id="tracks"></div>
+        <div class="emptystate" id="no-tracks" style="display:none"><div><div class="big">🎧</div>Aún no hay pistas.<br><span style="color:var(--dim);font-size:13px">Compón algunas con el botón «Componer» de arriba.</span></div></div>
+      </div>
+      <div class="tabpane" id="pane-videos">
+        <div class="mtools">
+          <div class="mlive" id="v-live">
+            <span class="pill live">● EN DIRECTO</span>
+            <div class="mlive-txt"><b id="v-live-t">La emisión está parada</b><small id="v-live-r">aquí verás qué video se emite en el directo</small></div>
+            <div class="qprog"><i id="v-live-bar"></i></div>
+          </div>
+          <button class="btn" id="q-skip" onclick="saltarVideo()" title="Pasa al siguiente video en bucle sin cortar el directo">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg>Siguiente video
+          </button>
+        </div>
+        <div style="padding:0 10px"><p id="v-err" class="err" style="margin:0 0 10px"></p></div>
+        <div class="status-line vinfo-line"><span>Los videos con <b>«en bucle»</b> se emiten en este orden, cada uno el tiempo indicado, y vuelve a empezar. ▶ solo lo ves tú.</span><span id="cola-total"></span></div>
+        <div class="thead vgridcols"><span></span><span>#</span><span></span><span>video</span><span>en bucle</span><span>tiempo en bucle</span><span style="text-align:right">dur.</span><span></span></div>
+        <div class="tracklist" id="vlist"></div>
+        <div class="emptystate" id="no-videos"  style="display:none"><div><div class="big">🎞️</div>Aún no hay videos.<br><span style="color:var(--dim);font-size:13px">Sube uno o genera una escena nocturna.</span></div></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- derecha: emisión -->
+  <div class="col right">
+    <section class="card stream-card">
+      <div class="card-h"><span class="num">04</span><h2>Emisión en directo</h2><span class="right pill" id="s-keystate">sin clave</span></div>
+
+      <div class="broadcast" id="s-box">
+        <div id="s-player" hidden>
+          <div class="liveplayer">
+            <video id="s-video" muted autoplay playsinline></video>
+            <span class="pill badge live" id="s-badge">● EN DIRECTO</span>
+            <div class="lp-wait" id="s-wait"><div><div class="spinner"></div>conectando con el directo…</div></div>
+            <div class="lp-ctrls">
+              <div class="lp-vol" title="volumen del directo en esta página (no cambia lo que se emite)">
+                <button class="iconbtn" id="s-mute" onclick="silenciarDirecto()" title="activar/silenciar sonido"></button>
+                <input type="range" id="s-vol" min="0" max="1" step="0.01" value="0.8" aria-label="volumen del directo">
+              </div>
+              <button class="iconbtn" onclick="pantallaCompleta()" title="pantalla completa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+            </div>
+          </div>
+          <div class="lp-info"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex:none"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg><b id="s-vnow">—</b><span class="right lp-uptime" id="s-uptime" title="tiempo que lleva la emisión en marcha"></span><span class="lp-left" id="s-vleft"></span></div>
+        </div>
+        <div id="s-idle">
+          <div class="rings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19 5a10 10 0 0 1 0 14M5 19A10 10 0 0 1 5 5"/></svg></div>
+          <div class="big" id="s-big">FUERA DE AIRE</div>
+          <div class="sub" id="s-msg">la emisión está parada</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--dim)" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 9.2-9.2M17 6l3 3M14 9l2 2"/></svg>
+        <input id="s-key" type="password" placeholder="Clave de emisión de YouTube" autocomplete="off" title="YouTube Studio → Emitir en directo → «Clave de emisión». Solo se guarda en este servidor.">
+        <button class="iconbtn" onclick="verClave()" title="mostrar/ocultar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        <button class="btn sm" onclick="guardarClave()">Guardar</button>
+      </div>
+
+      <button id="s-local" class="btn block" style="margin-top:10px" onclick="startLocal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Solo vista previa local (sin YouTube)
+      </button>
+      <div class="vlcline" id="s-vlc" hidden>
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex:none"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
+        VLC<b id="s-vlcurl"></b>
+        <button class="iconbtn" onclick="copiarVlc()" title="copiar enlace"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
+      </div>
+      <div class="btnpair">
+        <button id="s-live" class="btn live" onclick="startStream()">
+          <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"/></svg>Emitir en YouTube
+        </button>
+        <button id="s-stop" class="btn" onclick="stopStream()">
+          <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>Detener
+        </button>
+      </div>
+
+      <div class="watch" id="s-auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg><span id="s-autotxt">vigilante 24/7 desactivado</span></div>
+    </section>
+  </div>
+</main>
+
+<!-- ============ reproductor ============ -->
+<footer class="playerbar" id="pbar">
+  <div class="pb-now" title="Reproductor para escuchar en este navegador; no afecta al directo"><div class="pb-cover" id="pb-cover"></div><div><span class="pb-tag">escucha local</span><b id="pb-title">Nada sonando</b><small id="pb-sub">elige una canción para escucharla aquí</small></div></div>
+  <div class="pb-center">
+    <div class="pb-ctrl">
+      <button class="iconbtn" onclick="saltar(-1)" title="anterior"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+      <button class="pb-play" id="pb-play" onclick="togglePlay(actual || orden[0])"></button>
+      <button class="iconbtn" onclick="saltar(1)" title="siguiente"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+    </div>
+    <div class="pb-seek"><span id="pb-cur">0:00</span><input type="range" id="pb-seek" min="0" max="1" step="0.1" value="0"><span id="pb-dur">0:00</span></div>
+  </div>
+  <div class="pb-right">
+    <svg class="vicon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+    <input type="range" id="vol" min="0" max="1" step="0.01" value="0.8">
+  </div>
+</footer>
+
+<div class="toasts" id="toasts"></div>
+<aside class="drawer" id="logs" aria-label="Logs">
+  <div class="drawer-h">
+    <h2>Logs</h2>
+    <div class="tabs">
+      <button class="tab on" data-log="stream" onclick="verLog('stream')">Emisión</button>
+      <button class="tab" data-log="vigilante" onclick="verLog('vigilante')">Vigilante 24/7</button>
+    </div>
+    <div class="right">
+      <button class="btn sm" onclick="copiarLog()">Copiar</button>
+      <button class="iconbtn" onclick="cerrarLogs()" title="cerrar (Esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+  </div>
+  <div class="terminal">
+    <div class="bar"><i></i><i></i><i></i><span id="log-name">STREAM.LOG</span><span style="margin-left:auto" id="log-upd"></span></div>
+    <pre id="s-log">cargando…</pre>
+  </div>
+</aside>
+<div class="modal" id="vmodal" onclick="if(event.target===this) cerrarVideo()"><div class="box" style="width:min(900px,100%); padding:14px">
+  <video id="vm-video" controls autoplay muted playsinline style="width:100%; border-radius:12px; display:block; background:#000"></video>
+  <div class="acts" style="margin-top:12px; align-items:center"><b id="vm-name" style="margin-right:auto; font-size:14px"></b>
+  <button class="btn" onclick="cerrarVideo()">Cerrar</button><button class="btn primary" id="vm-add">Activar en bucle</button></div></div></div>
+<div class="modal" id="modal"><div class="box"><h3 id="m-title"></h3><p id="m-text"></p>
+  <div class="acts"><button class="btn" id="m-no">Cancelar</button><button class="btn primary" id="m-yes">Aceptar</button></div></div></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = s => { s = Math.max(0, s || 0); return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`; };
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const hue = s => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg>';
+const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4.5" height="16" rx="1.2"/><rect x="13.5" y="4" width="4.5" height="16" rx="1.2"/></svg>';
+const ICON_DEL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>';
+
+let knownTracks = "", arrastrando = false, tracks = {}, orden = [], actual = null;
+
+// ---------------- utilidades de interfaz ----------------
+function toast(msg, bad) {
+  const t = document.createElement("div");
+  t.className = "toast" + (bad ? " bad" : ""); t.textContent = msg;
+  $("toasts").appendChild(t);
+  setTimeout(() => { t.classList.add("out"); setTimeout(() => t.remove(), 300); }, 3800);
+}
+let cerrarConfirmar = null;
+function confirmar(title, text, okLabel, danger) {
+  return new Promise(res => {
+    $("m-title").textContent = title; $("m-text").textContent = text;
+    const yes = $("m-yes"); yes.textContent = okLabel || "Aceptar";
+    yes.className = "btn " + (danger ? "live" : "primary");
+    $("modal").classList.add("open");
+    const fin = v => { $("modal").classList.remove("open"); yes.onclick = $("m-no").onclick = null; cerrarConfirmar = null; res(v); };
+    cerrarConfirmar = () => fin(false);
+    yes.onclick = () => fin(true); $("m-no").onclick = () => fin(false);
+  });
+}
+function setRange(el, v, max) {
+  if (max != null) el.max = max;
+  el.value = v;
+  el.style.setProperty("--p", (el.max > 0 ? (v / el.max) * 100 : 0) + "%");
+}
+setInterval(() => { $("clock").textContent = new Date().toLocaleTimeString("es-ES"); }, 1000);
+
+// ---------------- reproductor ----------------
+const player = new Audio();
+player.preload = "metadata";
+try { player.volume = +(localStorage.getItem("vol") ?? 0.8); } catch { player.volume = .8; }
+setRange($("vol"), player.volume);
+$("vol").addEventListener("input", e => {
+  player.volume = +e.target.value; setRange(e.target, player.volume);
+  try { localStorage.setItem("vol", player.volume); } catch {}
+});
+
+let actx, analyser, fdata;
+function initAudio() {
+  try {
+    if (!actx) {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      const src = actx.createMediaElementSource(player);
+      analyser = actx.createAnalyser(); analyser.fftSize = 256; analyser.smoothingTimeConstant = .8;
+      src.connect(analyser); analyser.connect(actx.destination);
+      fdata = new Uint8Array(analyser.frequencyBinCount);
+    }
+    if (actx.state === "suspended") actx.resume();
+  } catch {}
+}
+
+function pintarEstadoPlayer() {
+  const sonando = actual && !player.paused;
+  document.querySelectorAll(".track[data-name]").forEach(r => {
+    const act = r.dataset.name === actual;
+    r.classList.toggle("activo", act);
+    r.classList.toggle("sonando", act && sonando);
+    r.querySelector(".pp").innerHTML = (act && sonando) ? ICON_PAUSE : ICON_PLAY;
+  });
+  $("pb-play").innerHTML = sonando ? ICON_PAUSE : ICON_PLAY;
+  $("hero").classList.toggle("playing", !!sonando);
+  const t = tracks[actual];
+  if (t) {
+    const h = hue(t.name);
+    for (const el of [$("hero"), $("pb-cover")]) el.style.setProperty("--h", h);
+    $("h-eyebrow").textContent = sonando ? "♪ sonando ahora" : "en pausa";
+    $("h-title").textContent = t.title;
+    $("h-chips").innerHTML = (t.tema ? t.tema.split("·") : ["sin tema"]).map(x => `<span class="chip">${esc(x.trim())}</span>`).join("");
+    $("pb-title").textContent = t.title;
+    $("pb-sub").textContent = t.tema || "—";
+    $("pb-dur").textContent = fmt(t.dur);
+    document.title = (sonando ? "♪ " : "") + t.title + " · Radio Lofi";
+  }
+}
+function cargar(name, at) {
+  actual = name; player.src = "/tracks/" + encodeURIComponent(name);
+  const src = player.src;
+  if (at) player.addEventListener("loadedmetadata", () => { if (player.src === src) player.currentTime = at; }, {once: true});
+  player.play().catch(() => {});
+}
+function togglePlay(name) {
+  if (!name) return;
+  initAudio();
+  if (actual === name) { player.paused ? player.play().catch(()=>{}) : player.pause(); }
+  else cargar(name);
+  pintarEstadoPlayer();
+}
+function saltar(d) {
+  if (!orden.length) return;
+  const i = orden.indexOf(actual);
+  initAudio();
+  cargar(orden[(i + d + orden.length) % orden.length]);
+  pintarEstadoPlayer();
+}
+player.addEventListener("play", pintarEstadoPlayer);
+player.addEventListener("pause", pintarEstadoPlayer);
+player.addEventListener("ended", () => saltar(1));          // encadena con la siguiente
+player.addEventListener("timeupdate", () => {
+  if (!actual || arrastrando) return;
+  const dur = tracks[actual]?.dur || player.duration || 0;
+  setRange($("pb-seek"), player.currentTime, dur);
+  $("pb-cur").textContent = fmt(player.currentTime);
+  const mini = document.querySelector(`.track[data-name="${CSS.escape(actual)}"] .mini i`);
+  if (mini) mini.style.width = (dur ? player.currentTime / dur * 100 : 0) + "%";
+});
+$("pb-seek").addEventListener("input", e => { arrastrando = true; setRange(e.target, +e.target.value); $("pb-cur").textContent = fmt(+e.target.value); });
+$("pb-seek").addEventListener("change", e => {
+  arrastrando = false;
+  if (!actual) { if (orden[0]) { initAudio(); cargar(orden[0], +e.target.value); } }
+  else player.currentTime = +e.target.value;
+  pintarEstadoPlayer();
+});
+document.addEventListener("keydown", e => {
+  if (e.code !== "Space" || /INPUT|TEXTAREA|BUTTON/.test(e.target.tagName)) return;
+  e.preventDefault(); togglePlay(actual || orden[0]);
+});
+
+// lista: delegación de eventos
+$("tracks").addEventListener("click", e => {
+  const row = e.target.closest(".track"); if (!row || e.target.closest("input") || sinClick) return;
+  if (e.target.closest(".tdel")) borrar(row.dataset.name);
+  else if (e.target.closest('[data-act="renombrar"]')) renombrarCancion(row);
+  else togglePlay(row.dataset.name);
+});
+$("tracks").addEventListener("dblclick", e => {
+  const row = e.target.closest(".track");
+  if (row && e.target.closest(".ttitle")) { e.preventDefault(); renombrarCancion(row); }
+});
+// edición en línea del título de una canción: Enter guarda, Esc cancela
+function renombrarCancion(row) {
+  const archivo = row.dataset.name, caja = row.querySelector(".ttl");
+  if (!caja) return;
+  const inp = document.createElement("input");
+  inp.className = "vrename"; inp.value = tracks[archivo]?.title || ""; inp.maxLength = 80;
+  caja.replaceWith(inp); inp.focus(); inp.select();
+  let hecho = false;
+  const terminar = async guardar => {
+    if (hecho) return; hecho = true;
+    const nuevo = inp.value.trim().replace(/\s+/g, " ");
+    if (guardar && nuevo && nuevo !== tracks[archivo]?.title) {
+      try { await post(`/api/track/${encodeURIComponent(archivo)}/titulo`, {titulo: nuevo}); toast(`Renombrada: «${nuevo}»`); }
+      catch (err) { toast(err.message, true); }
+    } else if (guardar && !nuevo) toast("El nombre no puede estar vacío", true);
+    inp.blur(); knownTracks = ""; refresh();
+  };
+  inp.addEventListener("click", ev => ev.stopPropagation());
+  inp.addEventListener("keydown", ev => { ev.stopPropagation(); if (ev.key === "Enter") terminar(true); else if (ev.key === "Escape") terminar(false); });
+  inp.addEventListener("blur", () => terminar(true));
+}
+async function saltarCancion() {
+  try { await post("/api/musica/saltar"); toast("Cambiando de canción en el directo…"); setTimeout(refresh, 1500); }
+  catch (e) { toast(e.message, true); }
+}
+function filtrar() {
+  const q = $("q").value.trim().toLowerCase();
+  const sel = tabActual === "musica" ? ".track[data-name]" : ".vitem[data-name]";
+  document.querySelectorAll(sel).forEach(r => {
+    r.style.display = !q || r.dataset.search.includes(q) ? "" : "none";
+  });
+}
+
+// ---------------- visualizador ----------------
+const viz = $("viz"), vctx = viz.getContext("2d");
+let vizTam = {w: 0, h: 0, g: null}, vizUlt = 0;
+new ResizeObserver(() => { vizTam.w = 0; }).observe(viz);
+function drawViz(t) {
+  requestAnimationFrame(drawViz);
+  const live = analyser && !player.paused;
+  // sin sonido local, la onda en reposo basta a ~15 fps; con la pestaña oculta, nada
+  if (document.hidden || (!live && t - vizUlt < 66)) return;
+  vizUlt = t;
+  const dpr = devicePixelRatio || 1;
+  if (!vizTam.w) {
+    vizTam.w = viz.clientWidth; vizTam.h = viz.clientHeight;
+    viz.width = vizTam.w * dpr; viz.height = vizTam.h * dpr;
+    vizTam.g = vctx.createLinearGradient(0, 0, vizTam.w, 0);
+    vizTam.g.addColorStop(0, "#ffb35c"); vizTam.g.addColorStop(.55, "#ff6f91"); vizTam.g.addColorStop(1, "#9b7bff");
+  }
+  const w = vizTam.w, h = vizTam.h;
+  vctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  vctx.clearRect(0, 0, w, h);
+  const n = Math.max(24, Math.min(72, Math.floor(w / 9))), gap = 3, bw = (w - gap * (n - 1)) / n;
+  if (live) analyser.getByteFrequencyData(fdata);
+  vctx.fillStyle = vizTam.g;
+  for (let i = 0; i < n; i++) {
+    let v;
+    if (live) { const b = Math.floor(Math.pow(i / n, 1.4) * fdata.length * .75); v = fdata[b] / 255; }
+    else v = .08 + .06 * Math.sin(t / 700 + i * .35) + .04 * Math.sin(t / 430 + i * .9);
+    const bh = Math.max(3, v * (h - 6));
+    const x = i * (bw + gap), y = (h - bh) / 2;
+    vctx.globalAlpha = live ? .95 : .45;
+    vctx.beginPath(); vctx.roundRect ? vctx.roundRect(x, y, bw, bh, bw / 2) : vctx.rect(x, y, bw, bh); vctx.fill();
+  }
+}
+requestAnimationFrame(drawViz);
+
+// ---------------- cielo nocturno de fondo ----------------
+const sky = $("sky"), sctx = sky.getContext("2d");
+let stars = [], skyline = [];
+function buildSky() {
+  const w = innerWidth, h = innerHeight, dpr = devicePixelRatio || 1;
+  sky.width = w * dpr; sky.height = h * dpr; sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  stars = Array.from({length: Math.floor(w * h / 5000)}, () => ({x: rnd() * w, y: rnd() * h * .75, r: rnd() * 1.2 + .2, p: rnd() * 6.28, s: .5 + rnd() * 1.5}));
+  skyline = []; let x = 0;
+  while (x < w) {
+    const bw = 40 + rnd() * 90, bh = 40 + rnd() * 130, wins = [];
+    for (let k = 0; k < bw * bh / 500; k++) if (rnd() < .45) wins.push([x + 5 + rnd() * (bw - 12), h - bh + 6 + rnd() * (bh - 14), rnd()]);
+    skyline.push({x, bw, bh, wins}); x += bw + 2 + rnd() * 12;
+  }
+}
+function drawSky(t) {
+  if (document.hidden) { setTimeout(() => requestAnimationFrame(drawSky), 1000); return; }
+  const w = innerWidth, h = innerHeight;
+  sctx.clearRect(0, 0, w, h);
+  for (const s of stars) {
+    sctx.globalAlpha = .25 + .55 * (0.5 + 0.5 * Math.sin(t / 1000 * s.s + s.p));
+    sctx.fillStyle = "#fff"; sctx.beginPath(); sctx.arc(s.x, s.y, s.r, 0, 6.28); sctx.fill();
+  }
+  // luna
+  const mx = w * .82, my = h * .16;
+  const halo = sctx.createRadialGradient(mx, my, 10, mx, my, 160);
+  halo.addColorStop(0, "rgba(255,220,170,.22)"); halo.addColorStop(1, "rgba(255,220,170,0)");
+  sctx.globalAlpha = 1; sctx.fillStyle = halo; sctx.beginPath(); sctx.arc(mx, my, 160, 0, 6.28); sctx.fill();
+  sctx.fillStyle = "rgba(255,236,205,.35)"; sctx.beginPath(); sctx.arc(mx, my, 34, 0, 6.28); sctx.fill();
+  // edificios
+  sctx.globalAlpha = .55;
+  for (const b of skyline) {
+    sctx.fillStyle = "#06050c"; sctx.fillRect(b.x, h - b.bh, b.bw, b.bh);
+    for (const [wx, wy, f] of b.wins) {
+      sctx.fillStyle = f > .15 || Math.sin(t / 2500 + f * 50) > -.6 ? "rgba(255,179,92,.7)" : "rgba(255,179,92,.1)";
+      sctx.fillRect(wx, wy, 3, 3);
+    }
+  }
+  // ~8 fps basta para el titileo; con la pestaña oculta se espera sin dibujar
+  setTimeout(() => requestAnimationFrame(drawSky), document.hidden ? 1000 : 125);
+}
+let skyResize;
+addEventListener("resize", () => { clearTimeout(skyResize); skyResize = setTimeout(buildSky, 150); });
+buildSky(); requestAnimationFrame(drawSky);
+
+// ---------------- API ----------------
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+const post = (path, body) => api(path, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body || {})});
+
+let videoRunningPrev = false;
+let refrescoN = 0;
+async function refresh() {
+  const n = ++refrescoN;
+  let s;
+  try { s = await api("/api/state"); } catch { return; }
+  if (n !== refrescoN) return;   // ya hay una petición más reciente en camino
+
+  // estadísticas
+  $("st-tracks").textContent = s.tracks.length;
+  $("n-mus").textContent = s.tracks.length; $("n-vid").textContent = s.videos.length;
+  $("st-mins").textContent = Math.round(s.tracks.reduce((a, t) => a + t.dur, 0) / 60);
+  const local = s.stream.running && s.stream.mode === "local";
+  const live = s.stream.running && s.stream.mode === "directo";
+
+  // generación
+  $("g-btn").disabled = s.gen.running;
+  const gp = $("g-prog");
+  gp.classList.toggle("indet", s.gen.running && s.gen.done === 0);
+  gp.querySelector("i").style.width = s.gen.total ? (s.gen.done / s.gen.total * 100) + "%" : "0";
+  $("g-status").textContent = s.gen.running ? s.gen.current || "preparando…"
+    : (s.gen.total ? "última tanda completada" : "");
+  $("g-frac").textContent = s.gen.total ? `${s.gen.done}/${s.gen.total}` : "";
+  const creandoVid = s.video.running && s.video.total;
+  $("g-open").classList.toggle("busy", s.gen.running || !!creandoVid);
+  $("g-openlbl").textContent = s.gen.running ? `Componiendo ${s.gen.done}/${s.gen.total}`
+    : creandoVid ? `Creando video ${s.video.done + 1}/${s.video.total}` : "Componer";
+  $("g-err").textContent = s.gen.error;
+
+  // pistas (solo se re-pinta si cambia la lista, para no cortar la reproducción)
+  const enDirecto = s.stream.running ? (s.musica?.name || "") : "";
+  const editandoMus = document.activeElement?.closest?.("#tracks") || (arr && arr.lst.id === "tracks");
+  const convMus = s.video.running && s.video.destino === "musica";
+  const sig = editandoMus ? knownTracks : JSON.stringify([s.tracks.map(t => t.name + "\u0001" + t.title), enDirecto, convMus]);
+  if (sig !== knownTracks) {
+    const nuevas = knownTracks && s.tracks.length > Object.keys(tracks).length;
+    knownTracks = sig;
+    tracks = Object.fromEntries(s.tracks.map(t => [t.name, t]));
+    orden = s.tracks.map(t => t.name);
+    $("tracks").innerHTML = (convMus ? `<div class="track busyrow"><span></span><div class="idx" style="--h:280"><div class="spinner" style="width:18px;height:18px;margin:0;border-width:2px"></div></div>
+        <div style="min-width:0"><div class="ttitle">Convirtiendo ${esc(proceso.nombre || "audio")} a MP3…</div><div class="tsub">en unos segundos aparecerá aquí y entrará en el directo</div></div></div>` : "") + s.tracks.map((t, i) => `
+      <div class="track${t.name === enDirecto ? " endirecto" : ""}" data-name="${esc(t.name)}" data-search="${esc((t.title + " " + t.tema + " " + t.name).toLowerCase())}"
+           style="--h:${hue(t.name)}; animation-delay:${Math.min(i, 15) * 25}ms">
+        <span class="grip" title="arrastra para cambiar el orden"><svg viewBox="0 0 10 16" fill="currentColor"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg></span><div class="idx"><span class="n">${i + 1}</span><span class="pp">${ICON_PLAY}</span><span class="eq"><i></i><i></i><i></i></span></div>
+        <div style="min-width:0"><div class="ttl"><div class="ttitle" title="doble clic para cambiar el nombre">${esc(t.title)}</div>${t.name === enDirecto ? '<span class="ldot">EN DIRECTO</span>' : ""}<button class="iconbtn vedit" data-act="renombrar" title="cambiar el nombre">${ICON_EDIT}</button></div><div class="tsub">${t.name === enDirecto ? "sonando en el directo" : esc(t.name)}</div></div>
+        <div class="ttema">${esc(t.tema || "—")}</div>
+        <div class="tdur">${fmt(t.dur)}</div>
+        <button class="iconbtn tdel" title="borrar">${ICON_DEL}</button>
+        <div class="mini"><i></i></div>
+      </div>`).join("");
+    $("no-tracks").style.display = s.tracks.length || convMus ? "none" : "grid";
+    $("tracks").style.display = s.tracks.length || convMus ? "" : "none";
+    filtrar(); pintarEstadoPlayer();
+    if (nuevas) toast("Nuevas pistas en la biblioteca 🎶");
+  }
+
+  // videos y cola
+  ultimoEstado = s;
+  titulosVideo = Object.fromEntries(s.videos.map(v => [v.name, v.title]));
+  $("v-btn").disabled = s.video.running;
+  pintarTipos(s.tipos_escena);
+  pintarEstilos(s.estilos_musica);
+  const escenaEnCurso = s.video.running && s.video.total;
+  const ep = $("e-prog");
+  ep.classList.toggle("indet", !!escenaEnCurso && s.video.done === 0);
+  ep.querySelector("i").style.width = s.video.total ? (s.video.done / s.video.total * 100) + "%" : "0";
+  $("e-status").textContent = escenaEnCurso ? `creando «${s.video.tipo}»…` : s.video.running ? "hay un video convirtiéndose…"
+    : (s.video.total ? "última tanda completada" : "");
+  $("e-frac").textContent = s.video.total ? `${s.video.done}/${s.video.total}` : "";
+  $("e-err").textContent = s.video.error && s.video.total ? s.video.error : "";
+  $("v-err").textContent = s.video.error;
+  if (videoRunningPrev && !s.video.running && !s.video.error)
+    toast(s.video.destino === "musica" ? "Canción añadida a Música 🎵" : "Video añadido a la biblioteca 🎞️");
+  videoRunningPrev = s.video.running;
+  pintarVideos(s);
+
+  // emisión
+  $("s-keystate").textContent = s.has_key ? "clave guardada" : "sin clave";
+  $("s-keystate").className = "right pill " + (s.has_key ? "on" : "warn");
+  $("s-live").disabled = s.stream.running || !s.has_key;
+  $("s-local").disabled = s.stream.running;
+  $("s-vlc").hidden = !s.stream.running;
+  $("s-vlcurl").textContent = `rtsp://${location.hostname}:8554/radio`;
+  $("s-stop").disabled = !s.stream.running;
+  $("s-box").className = "broadcast" + (live ? " live" : local ? " test" : "") + (s.stream.running ? " conplayer" : "");
+  $("s-player").hidden = !s.stream.running; $("s-idle").hidden = s.stream.running;
+  $("s-badge").textContent = live ? "● EN DIRECTO" : "● VISTA PREVIA";
+  $("s-badge").className = "pill badge " + (live ? "live" : "warn");
+  $("q-skip").disabled = !s.stream.running;
+  if (s.stream.running) conectarDirecto(); else desconectarDirecto();
+  $("s-big").textContent = live ? "EN DIRECTO" : local ? "VISTA PREVIA" : "FUERA DE AIRE";
+  $("s-msg").textContent = live ? "emitiendo a YouTube y a la red local"
+    : local ? "emitiendo en bucle a tu red local"
+    : "la emisión está parada";
+  $("logdot").className = "dot" + (s.stream.running ? " on" : "");
+  $("s-auto").classList.toggle("on", s.stream.auto);
+  $("s-autotxt").textContent = s.stream.auto
+    ? "Vigilante 24/7 activo: si la emisión se corta, se relanza sola en menos de un minuto"
+      + (s.stream.reinicios ? ` · relanzada ${s.stream.reinicios} ${s.stream.reinicios === 1 ? "vez" : "veces"} (última: ${s.stream.ultimo})` : "")
+    : "Vigilante 24/7 desactivado (se activa al emitir en directo)";
+}
+
+// ---------------- panel de logs ----------------
+let logActual = "stream", logTimer = null;
+const LOG_NOMBRE = {stream: "STREAM.LOG", vigilante: "WATCHDOG.LOG"};
+async function cargarLogs() {
+  try {
+    const j = await api("/api/logs"), pre = $("s-log");
+    const texto = j[logActual] || (logActual === "stream" ? "Aún no hay emisión registrada." : "El vigilante no ha tenido que relanzar la emisión.");
+    const abajo = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 30;
+    if (pre.textContent !== texto) { pre.textContent = texto; if (abajo) pre.scrollTop = pre.scrollHeight; }
+    $("log-upd").textContent = "actualizado " + new Date().toLocaleTimeString("es-ES");
+  } catch {}
+}
+function verLog(n) {
+  logActual = n; $("log-name").textContent = LOG_NOMBRE[n];
+  document.querySelectorAll("[data-log]").forEach(b => b.classList.toggle("on", b.dataset.log === n));
+  $("s-log").textContent = "cargando…"; cargarLogs().then(() => { $("s-log").scrollTop = $("s-log").scrollHeight; });
+}
+function abrirLogs() {
+  $("logs").classList.add("open"); $("logbtn").classList.add("on");
+  verLog(logActual); clearInterval(logTimer); logTimer = setInterval(cargarLogs, 2000);
+}
+function cerrarLogs() { $("logs").classList.remove("open"); $("logbtn").classList.remove("on"); clearInterval(logTimer); }
+function copiarLog() { navigator.clipboard?.writeText($("s-log").textContent).then(() => toast("Log copiado"), () => toast("No se pudo copiar", true)); }
+function copiarVlc() { navigator.clipboard?.writeText($("s-vlcurl").textContent).then(() => toast("Enlace de VLC copiado"), () => toast("No se pudo copiar", true)); }
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  if (cerrarConfirmar) cerrarConfirmar();
+  cerrarLogs(); cerrarComponer(); cerrarSubida(); cerrarVideo(); cerrarPixabay();
+});
+function abrirComponer(e) { e.stopPropagation(); $("g-pop").classList.toggle("open"); $("g-open").classList.toggle("on", $("g-pop").classList.contains("open")); }
+function cerrarComponer() { $("g-pop").classList.remove("open"); $("g-open").classList.remove("on"); }
+
+// ---------------- Pixabay ----------------
+// Pixabay no se puede mostrar dentro del panel (Cloudflare y sin API de música):
+// se busca y escucha allí, y aquí se importa el archivo o el enlace de su audio.
+function abrirPixabay(e) { e.stopPropagation(); $("px-pop").classList.toggle("open"); $("px-open").classList.toggle("on", $("px-pop").classList.contains("open")); if ($("px-pop").classList.contains("open")) $("px-q").focus(); }
+function cerrarPixabay() { $("px-pop").classList.remove("open"); $("px-open").classList.remove("on"); }
+function abrirBusqueda(q) { window.open(`https://pixabay.com/es/music/search/${encodeURIComponent(q.trim() || "lofi")}/`, "_blank", "noopener"); }
+function buscarPixabay(e) { e.preventDefault(); abrirBusqueda($("px-q").value); }
+// marcador: se ejecuta en la página de Pixabay (en el navegador del usuario, que sí la ve),
+// busca el audio de la canción y abre el panel con #importar=<enlace>&titulo=<nombre>
+function marcadorPixabay(o) {
+  const h = document.documentElement.innerHTML.replace(/\\u002F/gi, "/").replace(/\\\//g, "/");
+  const a = [...document.querySelectorAll("audio,source")].map(x => x.currentSrc || x.src || "")
+    .find(u => /cdn\.pixabay\.com\/audio\//.test(u));
+  const m = a || (h.match(/https:\/\/cdn\.pixabay\.com\/audio\/[^"'\s<>\\]+?\.mp3/) || [])[0];
+  if (!m) { alert("Radio Lofi: no encuentro el audio de esta página. Pulsa ▶ en la canción y vuelve a pulsar el marcador."); return; }
+  const t = ((document.querySelector("h1") || {}).textContent || document.title).trim();
+  window.open(o + "/#importar=" + encodeURIComponent(m) + "&titulo=" + encodeURIComponent(t), "radiolofi");
+}
+const MARCADOR = "(" + marcadorPixabay.toString() + ")(" + JSON.stringify(location.origin) + ")";
+$("px-mark").href = "javascript:" + encodeURIComponent(MARCADOR);
+// el panel abierto por el marcador importa lo que trae en la dirección
+async function importarDesdeMarcador() {
+  if (!location.hash.startsWith("#importar=")) return;
+  const p = new URLSearchParams(location.hash.slice(1));
+  history.replaceState(null, "", location.pathname);
+  try {
+    await post("/api/importar", {url: p.get("importar"), titulo: p.get("titulo") || ""});
+    verTab("musica"); videoRunningPrev = true; knownTracks = "";
+    toast(`Importando «${p.get("titulo") || "canción"}» desde Pixabay…`);
+  } catch (e) { toast(e.message, true); }
+  refresh();
+}
+importarDesdeMarcador();
+addEventListener("hashchange", importarDesdeMarcador);
+$("px-chips").innerHTML = ["lofi", "lofi chill", "lofi hip hop", "jazz", "piano", "lluvia", "ambient", "study"]
+  .map(q => `<span class="chip">${q}</span>`).join("");
+$("px-chips").addEventListener("click", e => { const c = e.target.closest(".chip"); if (c) abrirBusqueda(c.textContent); });
+async function importarPixabay(e) {
+  e.preventDefault();
+  $("px-err").textContent = ""; $("px-imp").disabled = true;
+  try {
+    const r = await post("/api/importar", {url: $("px-url").value});
+    $("px-url").value = ""; cerrarPixabay();
+    verTab(r.tipo === "musica" ? "musica" : "videos"); videoRunningPrev = true; knownTracks = "";
+    toast("Descargado de Pixabay, añadiéndolo a la biblioteca…");
+  } catch (err) { $("px-err").textContent = err.message; }
+  $("px-imp").disabled = false; refresh();
+}
+const pxDrop = $("px-drop");
+["dragenter", "dragover"].forEach(ev => pxDrop.addEventListener(ev, e => { e.preventDefault(); pxDrop.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => pxDrop.addEventListener(ev, e => { e.preventDefault(); pxDrop.classList.remove("over"); }));
+pxDrop.addEventListener("drop", e => { if (e.dataTransfer.files[0]) { cerrarPixabay(); subirVideo(e.dataTransfer.files[0]); } });
+$("px-file").addEventListener("change", e => { if (e.target.files[0]) { cerrarPixabay(); subirVideo(e.target.files[0]); } e.target.value = ""; });
+document.addEventListener("click", e => { if (!e.target.closest("#px-wrap")) cerrarPixabay(); });
+document.addEventListener("click", e => { if (!e.target.closest(".compose-wrap:not(.pixa-wrap)")) cerrarComponer(); });
+
+// ---------------- acciones ----------------
+function verComp(t) {
+  document.querySelectorAll("[data-comp]").forEach(b => b.classList.toggle("on", b.dataset.comp === t));
+  $("comp-musica").hidden = t !== "musica"; $("comp-video").hidden = t !== "video";
+}
+const _ic = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICONO_ESCENA = {
+  aleatorio: _ic('<path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>'),
+  noche: _ic('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'),
+  amanecer: _ic('<path d="M17 18a5 5 0 0 0-10 0M12 2v7M4.2 10.2l1.4 1.4M1 18h2M21 18h2M18.4 11.6l1.4-1.4M23 22H1M8 6l4-4 4 4"/>'),
+  dia: _ic('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/>'),
+  atardecer: _ic('<path d="M17 18a5 5 0 0 0-10 0M12 9V2M4.2 10.2l1.4 1.4M1 18h2M21 18h2M18.4 11.6l1.4-1.4M23 22H1M16 5l-4 4-4-4"/>'),
+  lluvia: _ic('<path d="M20 16.6A5 5 0 0 0 18 7h-1.3A8 8 0 1 0 4 15.3M8 19v2M8 13v2M16 19v2M16 13v2M12 21v2M12 15v2"/>'),
+  nieve: _ic('<path d="M12 2v20M2 12h20M5 5l14 14M19 5 5 19M9 3l3 3 3-3M9 21l3-3 3 3M3 9l3 3-3 3M21 9l-3 3 3 3"/>'),
+  aurora: _ic('<path d="M2 16c3-6 6-6 10-2s7 4 10-2M2 11c3-6 6-6 10-2s7 4 10-2M5 3v1M19 3v1M12 2v1"/>'),
+};
+let tipoEscena = "aleatorio";
+function pintarTipos(tipos) {
+  if ($("e-tipos").childElementCount || !tipos) return;
+  $("e-tipos").innerHTML = Object.entries(tipos).map(([k, n]) =>
+    `<button class="escena${k === tipoEscena ? " on" : ""}" data-tipo="${esc(k)}"><span class="em">${ICONO_ESCENA[k] || ICONO_ESCENA.noche}</span><span class="en">${esc(n)}</span></button>`).join("");
+}
+$("e-tipos").addEventListener("click", e => {
+  const b = e.target.closest(".escena"); if (!b) return;
+  tipoEscena = b.dataset.tipo;
+  document.querySelectorAll("#e-tipos .escena").forEach(x => x.classList.toggle("on", x === b));
+});
+const ICONO_ESTILO = {
+  aleatorio: ICONO_ESCENA.aleatorio,
+  estudiar: _ic('<path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/>'),
+  chill: _ic('<path d="M17 8h1a4 4 0 0 1 0 8h-1M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4zM6 2v3M10 2v3M14 2v3"/>'),
+  jazz: _ic('<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>'),
+  lluvioso: ICONO_ESCENA.lluvia,
+  retro: _ic('<rect x="2" y="6" width="20" height="12" rx="3"/><path d="M6 12h4M8 10v4M15 11h.01M18 13h.01"/>'),
+  ambiente: _ic('<path d="M2 12c2-3 4-3 6 0s4 3 6 0 4-3 6 0M2 17c2-3 4-3 6 0s4 3 6 0 4-3 6 0M2 7c2-3 4-3 6 0s4 3 6 0 4-3 6 0"/>'),
+  nocturno: ICONO_ESCENA.noche,
+};
+let estiloMusica = "aleatorio", estilosMusica = {};
+function pintarEstilos(estilos) {
+  if ($("m-estilos").childElementCount || !estilos) return;
+  estilosMusica = estilos;
+  $("m-estilos").innerHTML = Object.entries(estilos).map(([k, e]) =>
+    `<button class="escena${k === estiloMusica ? " on" : ""}" data-estilo="${esc(k)}" title="${esc(e.desc)}"><span class="em">${ICONO_ESTILO[k] || ICONO_ESTILO.jazz}</span><span class="en">${esc(e.nombre)}</span></button>`).join("");
+}
+$("m-estilos").addEventListener("click", e => {
+  const b = e.target.closest(".escena"); if (!b) return;
+  estiloMusica = b.dataset.estilo;
+  document.querySelectorAll("#m-estilos .escena").forEach(x => x.classList.toggle("on", x === b));
+});
+function stepE(d) { const o = $("e-count"); o.value = o.textContent = Math.max(1, Math.min(5, +o.textContent + d)); }
+function abrirSubida(e) { e.stopPropagation(); $("up-pop").classList.toggle("open"); $("up-open").classList.toggle("on", $("up-pop").classList.contains("open")); }
+function cerrarSubida() { $("up-pop").classList.remove("open"); $("up-open").classList.remove("on"); }
+document.addEventListener("click", e => { if (!e.target.closest("#up-wrap")) cerrarSubida(); });
+function step(d) { const o = $("g-count"); o.value = o.textContent = Math.max(1, Math.min(20, +o.textContent + d)); }
+
+async function generar() {
+  $("g-err").textContent = "";
+  const n = +$("g-count").textContent, nombre = estilosMusica[estiloMusica]?.nombre || "";
+  try { await post("/api/generate", {count: n, estilo: estiloMusica}); toast(`Componiendo ${n} ${n === 1 ? "canción" : "canciones"}${estiloMusica !== "aleatorio" ? " · " + nombre : ""}…`); }
+  catch (e) { $("g-err").textContent = e.message; }
+  refresh();
+}
+
+async function borrar(name) {
+  const t = tracks[name];
+  if (!await confirmar("¿Borrar pista?", `«${t ? t.title : name}» se eliminará del servidor.`, "Borrar", true)) return;
+  if (actual === name) { player.pause(); actual = null; }
+  await api(`/api/track/${encodeURIComponent(name)}`, {method: "DELETE"}).catch(() => {});
+  knownTracks = ""; toast("Pista borrada"); refresh();
+}
+
+// subida de video con barra de progreso
+const drop = $("v-drop");
+["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => { if (e.dataTransfer.files[0]) subirVideo(e.dataTransfer.files[0]); });
+$("v-file").addEventListener("change", e => { if (e.target.files[0]) subirVideo(e.target.files[0]); e.target.value = ""; });
+
+function subirVideo(f) {
+  $("v-err").textContent = ""; $("v-fname").textContent = f.name;
+  const bar = $("v-upprog"); bar.style.display = ""; bar.querySelector("i").style.width = "0";
+  const fd = new FormData(); fd.append("archivo", f);
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/subir");
+  proceso = {tipo: "subiendo", nombre: f.name, pct: 0}; firmaLista = "";
+  if (ultimoEstado) pintarVideos(ultimoEstado);
+  xhr.upload.onprogress = e => {
+    if (!e.lengthComputable) return;
+    proceso.pct = Math.round(e.loaded / e.total * 100);
+    bar.querySelector("i").style.width = proceso.pct + "%";
+    if ($("v-proc-txt")) { $("v-proc-txt").textContent = `Subiendo «${f.name}» · ${proceso.pct} %`; $("v-proc-bar").style.width = proceso.pct + "%"; }
+  };
+  xhr.onload = () => {
+    bar.style.display = "none";
+    let j = {}; try { j = JSON.parse(xhr.responseText); } catch {}
+    proceso = xhr.status >= 400 ? {tipo: "", nombre: "", pct: 0} : {tipo: "convirtiendo", nombre: f.name, pct: 100};
+    firmaLista = ""; knownTracks = "";
+    $("v-fname").textContent = "mp3, wav, m4a… → Música · mp4, mov, mkv… → Videos";
+    if (xhr.status < 400) cerrarSubida();
+    if (xhr.status >= 400) { $("v-err").textContent = j.error || xhr.statusText; toast(j.error || "No se pudo subir", true); }
+    else {
+      const musica = j.tipo === "musica";
+      verTab(musica ? "musica" : "videos");   // se lleva al usuario a la sección donde aparecerá
+      toast(musica ? "Es audio: se añade a Música, convirtiendo…" : "Es un video: se añade a Videos, convirtiendo…");
+      videoRunningPrev = true;
+    }
+    refresh();
+  };
+  xhr.onerror = () => { bar.style.display = "none"; $("v-err").textContent = "error de red al subir"; proceso = {tipo: "", nombre: "", pct: 0}; firmaLista = ""; refresh(); };
+  xhr.send(fd);
+}
+
+async function genVideo() {
+  $("e-err").textContent = "";
+  const n = +$("e-count").textContent;
+  try {
+    await post("/api/video", {tipo: tipoEscena, count: n});
+    videoRunningPrev = true; proceso = {tipo: "escena", nombre: "", pct: 100}; firmaLista = "";
+    toast(`Creando ${n} ${n === 1 ? "video" : "videos"} de ${$("e-tipos").querySelector(".on .en")?.textContent || "escena"}…`);
+  } catch (e) { $("e-err").textContent = e.message; }
+  refresh();
+}
+
+// ---------------- pestañas ----------------
+let tabActual = "videos";   // pestaña abierta por defecto
+function verTab(t) {
+  tabActual = t;
+  document.querySelectorAll(".tab[data-tab]").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
+  $("pane-musica").hidden = t !== "musica"; $("pane-videos").hidden = t !== "videos";
+  $("q").placeholder = t === "musica" ? "Buscar canción…" : "Buscar video…";
+  filtrar();
+}
+
+// ---------------- biblioteca de videos ----------------
+let ultimoEstado = null;
+const ICON_EDIT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
+// nombre visible: el título guardado en el servidor (editable) o, si no hay, el del archivo
+let titulosVideo = {};
+const nombreVideo = n => titulosVideo[n] || n.replace(/\.mp4$/, "").replace(/-/g, " ");
+const hms = s => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+  return h ? `${h} h ${String(m).padStart(2, "0")} min` : `${m}:${String(s % 60).padStart(2, "0")}`; };
+
+// La lista de videos ES la cola: todos los videos con su orden, horas e interruptor
+// «en bucle». Solo los activos se emiten; se guarda entera en /api/cola.
+let lista = [], firmaLista = "";
+function mezclarLista(s) {
+  const existen = new Set(s.videos.map(v => v.name));
+  const l = s.cola.filter(c => existen.has(c.video)).map(c => ({...c, activo: c.activo !== false}));
+  const vistos = new Set(l.map(c => c.video));
+  for (const v of [...s.videos].reverse()) if (!vistos.has(v.name)) l.push({video: v.name, hours: 1, activo: false});
+  return l;
+}
+const textoTiempo = min => { const h = Math.floor(min / 60), m = min % 60;
+  return h && m ? `${h} h ${m} min` : h ? `${h} h` : `${m} min`; };
+// fila de «trabajo en curso»: subida (con %), conversión o escena nocturna
+let proceso = {tipo: "", nombre: "", pct: 0};
+function textoProceso(s) {
+  if (proceso.tipo === "subiendo") return [`Subiendo «${proceso.nombre}» · ${proceso.pct} %`, "no cierres esta página hasta que termine la subida"];
+  if (s.video.running && s.video.total) return [`Creando escena «${s.video.tipo}» · ${Math.min(s.video.done + 1, s.video.total)} de ${s.video.total}`,
+                                                "cada video tarda entre 20 s y 1 min · aparecerán en la lista desactivados"];
+  if (s.video.running && s.video.destino === "musica") return null;   // esa fila sale en Música
+  if (s.video.running) return [proceso.nombre ? `Convirtiendo «${proceso.nombre}»…` : "Convirtiendo video…",
+                               "se pasa a 1080p sin audio · puede tardar unos minutos según la duración"];
+  return null;
+}
+function filaProceso(s) {
+  const t = textoProceso(s); if (!t) return "";
+  return `<div class="vitem busy"><span></span><span class="vpos"><span class="n">…</span></span>
+    <div class="vthumb2"><div class="spinner" style="width:20px;height:20px;margin:0;border-width:2px"></div></div>
+    <div class="vname"><b id="v-proc-txt">${esc(t[0])}</b><small>${esc(t[1])}</small></div>
+    <div class="qprog${proceso.tipo === "subiendo" ? "" : " indet"}"><i id="v-proc-bar" style="width:${proceso.pct}%"></i></div></div>`;
+}
+function pintarVideos(s) {
+  if (!s.video.running && proceso.tipo && proceso.tipo !== "subiendo") proceso = {tipo: "", nombre: "", pct: 0};
+  const editando = document.activeElement?.closest?.("#vlist") || (arr && arr.lst.id === "vlist");
+  const firma = JSON.stringify([s.cola, s.videos.map(v => v.name + v.size), s.actual?.id, s.video.running, s.video.done, s.video.tipo, proceso.tipo, proceso.nombre]);
+  if (firma !== firmaLista && !editando) {
+    firmaLista = firma; lista = mezclarLista(s);
+    const dur = Object.fromEntries(s.videos.map(v => [v.name, v]));
+    let orden = 0;
+    $("vlist").innerHTML = filaProceso(s) +
+      lista.map((c, i) => {
+        const emit = c.id && c.id === s.actual?.id, pos = c.activo ? ++orden : 0, v = dur[c.video] || {};
+        const est = emit ? "emitiendo" : c.activo ? `en bucle · ${pos}.º en la cola` : "desactivado · no se emite";
+        return `
+        <div class="vitem${emit ? " emitiendo" : ""}${c.activo ? "" : " off"}" data-i="${i}" data-name="${esc(c.video)}" data-search="${esc((nombreVideo(c.video) + " " + c.video).toLowerCase())}" style="animation-delay:${Math.min(i, 12) * 25}ms">
+          <span class="grip" title="arrastra para cambiar el orden"><svg viewBox="0 0 10 16" fill="currentColor"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg></span>
+          <button class="vpos" data-act="ver" title="ver el video (solo tú, no se emite)"><span class="n">${emit ? "●" : i + 1}</span>${ICON_PLAY}</button>
+          <img class="vthumb2" draggable="false" data-act="ver" src="/videos/${encodeURIComponent(c.video.replace(/\.mp4$/, ".jpg"))}?v=${v.size || 0}" alt="">
+          <div class="vname"><div class="vtitle"><b title="doble clic para cambiar el nombre · archivo: ${esc(c.video)}">${esc(nombreVideo(c.video))}</b>${emit ? '<span class="ldot">EN DIRECTO</span>' : ""}<button class="iconbtn vedit" data-act="renombrar" title="cambiar el nombre">${ICON_EDIT}</button></div><small class="vest">${est}</small></div>
+          <label class="switch" title="${c.activo ? "se emite en bucle" : "no se emite"}"><input type="checkbox" data-act="activo" ${c.activo ? "checked" : ""}><span></span></label>
+          <div class="hours tiempo" title="tiempo que se repite este video antes de pasar al siguiente">
+            <input type="number" min="0" max="720" step="1" value="${Math.floor(Math.round(c.hours * 60) / 60)}" data-act="horas" data-parte="h" aria-label="horas"><span>h</span>
+            <input type="number" min="0" max="59" step="5" value="${Math.round(c.hours * 60) % 60}" data-act="horas" data-parte="m" aria-label="minutos"><span>min</span>
+          </div>
+          <span class="tdur">${fmt(v.dur || 0)}</span>
+          <div class="qctl">
+            <button class="iconbtn qdel" data-act="borrar" title="borrar de la biblioteca">${ICON_DEL}</button>
+          </div>
+          <div class="qprog"><i></i></div>
+        </div>`; }).join("");
+    const activos = lista.filter(c => c.activo), total = activos.reduce((a, c) => a + c.hours, 0);
+    $("cola-total").textContent = activos.length ? `${activos.length} en bucle · ciclo de ${hms(total * 3600)}` : "ninguno en bucle";
+    $("no-videos").style.display = lista.length || s.video.running ? "none" : "grid";
+    $("vlist").style.display = lista.length || s.video.running ? "" : "none";
+    filtrar();
+  }
+  tickCola();
+}
+async function guardarLista(nueva) {
+  $("v-err").textContent = "";
+  try { await post("/api/cola", {cola: nueva}); firmaLista = ""; refresh(); }
+  catch (e) { $("v-err").textContent = e.message; }
+}
+function activarVideo(name, on = true) {
+  const n = lista.map(c => ({...c})), c = n.find(x => x.video === name);
+  if (c) { c.activo = on; guardarLista(n); toast(on ? `«${nombreVideo(name)}» en bucle (${hms(c.hours * 3600)})` : `«${nombreVideo(name)}» ya no se emite`); }
+}
+function tickCola() {
+  const s = ultimoEstado; if (!s) return;
+  const a = s.actual || {};
+  const restante = a.id ? a.horas * 3600 - (Date.now() / 1000 - a.inicio) : 0;
+  const fila = a.id && document.querySelector("#vlist .vitem.emitiendo");
+  if (fila) {
+    fila.querySelector(".vest").textContent = `emitiendo · quedan ${hms(restante)}`;
+    fila.querySelector(".qprog i").style.width = Math.min(100, (1 - restante / (a.horas * 3600)) * 100) + "%";
+  }
+  $("s-vnow").textContent = a.video ? nombreVideo(a.video) : "—";
+  // barra «EN DIRECTO» de la pestaña Videos
+  $("v-live").classList.toggle("on", !!a.id);
+  if (a.id) {
+    const total = a.horas * 3600, pas = Math.min(total, Date.now() / 1000 - a.inicio);
+    const activos = lista.filter(c => c.activo), k = activos.findIndex(c => c.id === a.id);
+    const sig = activos.length > 1 && k >= 0 ? activos[(k + 1) % activos.length] : null;
+    $("v-live-t").textContent = nombreVideo(a.video);
+    $("v-live-r").textContent = `quedan ${hms(total - pas)} de ${hms(total)}` + (sig ? ` · después: ${nombreVideo(sig.video)}` : " · se repite");
+    $("v-live-bar").style.width = Math.min(100, pas / total * 100) + "%";
+  } else {
+    $("v-live-t").textContent = s.stream.running ? "Preparando el video…" : "La emisión está parada";
+    $("v-live-r").textContent = s.stream.running ? "" : "aquí verás qué video se emite en el directo";
+  }
+  const mu = s.stream.running ? (s.musica || {}) : {}, t = mu.name && tracks[mu.name];
+  $("m-live").classList.toggle("on", !!mu.name);
+  $("m-skip").disabled = !s.stream.running;
+  if (mu.name) {
+    const pas = Date.now() / 1000 - mu.inicio, dur = mu.dur || t?.dur || 0;
+    $("m-live-t").textContent = t ? t.title : mu.name;
+    const k = orden.indexOf(mu.name), sig = orden.length > 1 && k >= 0 ? tracks[orden[(k + 1) % orden.length]] : null;
+    $("m-live-r").textContent = (dur ? `${fmt(Math.min(pas, dur))} / ${fmt(dur)}` : "") + (sig ? ` · después: ${sig.title}` : "");
+    $("m-live-bar").style.width = dur ? Math.min(100, pas / dur * 100) + "%" : "0";
+  } else {
+    $("m-live-t").textContent = s.stream.running ? "Preparando la música…" : "La emisión está parada";
+    $("m-live-r").textContent = s.stream.running ? "" : "aquí verás qué canción suena en el directo";
+  }
+  $("s-vleft").textContent = a.id ? `cambia en ${hms(restante)}` : "";
+  // cuánto lleva la emisión en marcha (h:mm:ss)
+  const ini = s.stream.running ? s.stream.inicio : 0, seg = ini ? Math.max(0, Math.floor(Date.now() / 1000 - ini)) : 0;
+  $("s-uptime").textContent = ini ? `● ${Math.floor(seg / 3600)}:${String(Math.floor(seg % 3600 / 60)).padStart(2, "0")}:${String(seg % 60).padStart(2, "0")}` : "";
+}
+setInterval(() => { if (!document.hidden) tickCola(); }, 1000);
+$("vlist").addEventListener("click", e => {
+  const b = e.target.closest("[data-act]"), row = e.target.closest(".vitem[data-i]");
+  if (!b || !row || b.tagName === "INPUT" || sinClick) return;
+  const i = +row.dataset.i, n = lista.map(c => ({...c})), act = b.dataset.act;
+  if (act === "ver") verVideo(n[i].video);
+  else if (act === "renombrar") renombrar(row);
+  else if (act === "borrar") borrarVideo(n[i].video);
+});
+$("vlist").addEventListener("change", e => {
+  const row = e.target.closest(".vitem[data-i]"); if (!row) return;
+  const i = +row.dataset.i;
+  if (e.target.dataset.act === "activo") { activarVideo(lista[i].video, e.target.checked); e.target.blur(); }
+  else if (e.target.dataset.act === "horas") {
+    // tiempo = horas + minutos; los minutos de más se pasan a horas (90 min → 1 h 30 min)
+    const caja = e.target.closest(".tiempo");
+    const h = Math.max(0, parseInt(caja.querySelector('[data-parte="h"]').value, 10) || 0);
+    const m = Math.max(0, parseInt(caja.querySelector('[data-parte="m"]').value, 10) || 0);
+    const total = h * 60 + m, n = lista.map(c => ({...c}));
+    if (total < 1) {   // mínimo 1 minuto: se restaura el valor guardado
+      const prev = Math.round(n[i].hours * 60);
+      caja.querySelector('[data-parte="h"]').value = Math.floor(prev / 60);
+      caja.querySelector('[data-parte="m"]').value = prev % 60;
+      toast("El tiempo mínimo es 1 minuto", true); return;
+    }
+    caja.querySelector('[data-parte="h"]').value = Math.floor(total / 60);
+    caja.querySelector('[data-parte="m"]').value = total % 60;
+    if (total === Math.round(n[i].hours * 60)) return;
+    n[i].hours = total / 60; guardarLista(n);
+    toast(`«${nombreVideo(n[i].video)}»: ${textoTiempo(total)} en bucle`);
+  }
+});
+$("vlist").addEventListener("dblclick", e => {
+  const row = e.target.closest(".vitem[data-i]");
+  if (row && e.target.closest(".vtitle b")) renombrar(row);
+});
+// edición en línea del nombre: Enter guarda, Esc cancela
+function renombrar(row) {
+  const archivo = lista[+row.dataset.i].video, b = row.querySelector(".vtitle b");
+  if (!b) return;
+  const inp = document.createElement("input");
+  inp.className = "vrename"; inp.value = nombreVideo(archivo); inp.maxLength = 80;
+  b.parentElement.replaceWith(inp);
+  inp.focus(); inp.select();
+  let hecho = false;
+  const terminar = async guardar => {
+    if (hecho) return; hecho = true;
+    const nuevo = inp.value.trim().replace(/\s+/g, " ");
+    if (guardar && nuevo && nuevo !== nombreVideo(archivo)) {
+      try { await post(`/api/videos/${encodeURIComponent(archivo)}/titulo`, {titulo: nuevo}); titulosVideo[archivo] = nuevo; toast(`Renombrado: «${nuevo}»`); }
+      catch (err) { toast(err.message, true); }
+    } else if (guardar && !nuevo) toast("El nombre no puede estar vacío", true);
+    inp.blur(); firmaLista = ""; refresh();
+  };
+  inp.addEventListener("keydown", ev => { if (ev.key === "Enter") terminar(true); else if (ev.key === "Escape") { ev.stopPropagation(); terminar(false); } });
+  inp.addEventListener("blur", () => terminar(true));
+}
+$("vlist").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.dataset.act === "horas") e.target.blur(); });
+function verVideo(name) {
+  $("vm-video").src = "/videos/" + encodeURIComponent(name); $("vm-name").textContent = nombreVideo(name);
+  const c = lista.find(x => x.video === name);
+  $("vm-add").hidden = !!c?.activo;
+  $("vm-add").onclick = () => { activarVideo(name, true); cerrarVideo(); };
+  $("vmodal").classList.add("open");
+}
+function cerrarVideo() { $("vmodal").classList.remove("open"); $("vm-video").pause(); $("vm-video").removeAttribute("src"); }
+async function borrarVideo(name) {
+  if (!await confirmar("¿Borrar video?", `«${nombreVideo(name)}» se eliminará de la biblioteca y dejará de emitirse.`, "Borrar", true)) return;
+  await api(`/api/videos/${encodeURIComponent(name)}`, {method: "DELETE"}).catch(e => toast(e.message, true));
+  toast("Video borrado"); refresh();
+}
+// ---------------- ordenar arrastrando ----------------
+// Se coge la fila (o el asa ⋮⋮) y se suelta en otra posición; los controles
+// (interruptor, tiempo, botones) siguen funcionando con clic normal.
+// Sirve para la lista de videos y para la de canciones.
+let arr = null, sinClick = false;
+function hacerOrdenable(lst, sel, alSoltar) {
+  lst.addEventListener("pointerdown", e => {
+    if (e.button !== 0 || arr) return;
+    const row = e.target.closest(sel);
+    if (!row || (e.target.closest("input, button, label, .switch") && !e.target.closest(".grip"))) return;
+    arr = {lst, sel, alSoltar, row, y0: e.clientY, en: false};
+    if (e.target.closest(".grip")) e.preventDefault();
+  });
+}
+document.addEventListener("pointermove", e => {
+  if (!arr) return;
+  if (!arr.en) {
+    if (Math.abs(e.clientY - arr.y0) < 6) return;
+    const r = arr.row.getBoundingClientRect();
+    arr.en = true; arr.dy = arr.y0 - r.top;
+    arr.ghost = arr.row.cloneNode(true);
+    arr.ghost.classList.add("fantasma");
+    Object.assign(arr.ghost.style, {left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px"});
+    document.body.appendChild(arr.ghost);
+    arr.row.classList.add("hueco");
+    document.body.classList.add("arrastrando");
+  }
+  arr.ghost.style.top = (e.clientY - arr.dy) + "px";
+  const lst = arr.lst, lr = lst.getBoundingClientRect();
+  if (e.clientY < lr.top + 40) lst.scrollTop -= 12; else if (e.clientY > lr.bottom - 40) lst.scrollTop += 12;
+  const otras = [...lst.querySelectorAll(arr.sel)].filter(r => r !== arr.row && r.style.display !== "none");
+  const antes = otras.find(r => { const b = r.getBoundingClientRect(); return e.clientY < b.top + b.height / 2; });
+  if (antes) { if (arr.row.nextElementSibling !== antes) lst.insertBefore(arr.row, antes); }
+  else if (otras.length && otras[otras.length - 1].nextElementSibling !== arr.row) otras[otras.length - 1].after(arr.row);
+});
+function soltarArrastre() {
+  if (!arr) return;
+  const a = arr; arr = null;
+  if (!a.en) return;
+  a.ghost.remove(); a.row.classList.remove("hueco"); document.body.classList.remove("arrastrando");
+  sinClick = true; setTimeout(() => { sinClick = false; }, 50);
+  a.alSoltar([...a.lst.querySelectorAll(a.sel)]);
+}
+document.addEventListener("pointerup", soltarArrastre);
+for (const l of [$("vlist"), $("tracks")]) l.addEventListener("dragstart", e => e.preventDefault());
+document.addEventListener("pointercancel", soltarArrastre);
+hacerOrdenable($("vlist"), ".vitem[data-i]", filas => {
+  const orden = filas.map(r => +r.dataset.i);
+  if (orden.some((v, k) => v !== k)) { guardarLista(orden.map(i => ({...lista[i]}))); toast("Orden de emisión actualizado"); }
+});
+hacerOrdenable($("tracks"), ".track[data-name]", async filas => {
+  const nombres = filas.map(r => r.dataset.name);
+  if (nombres.every((n, k) => n === orden[k])) return;
+  orden = nombres;   // el reproductor local también sigue el nuevo orden
+  try { await post("/api/musica/orden", {orden: nombres}); toast("Orden de las canciones actualizado"); }
+  catch (e) { toast(e.message, true); }
+  knownTracks = ""; refresh();
+});
+
+async function saltarVideo() {
+  try { await post("/api/cola/saltar"); toast("Pasando al siguiente video…"); setTimeout(refresh, 1500); }
+  catch (e) { toast(e.message, true); }
+}
+
+// ---------------- reproductor del directo (HLS desde MediaMTX) ----------------
+let hls = null, conectado = false;
+const ICON_MUTED = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m22 9-6 6M16 9l6 6"/></svg>';
+const ICON_SOUND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
+const sv = $("s-video");
+function pintarMute() { $("s-mute").innerHTML = sv.muted ? ICON_MUTED : ICON_SOUND; }
+pintarMute();
+sv.addEventListener("playing", () => { $("s-wait").hidden = true; });
+sv.addEventListener("waiting", () => { $("s-wait").hidden = false; });
+let hlsCargando = null;
+function cargarHls() {   // hls.js se descarga la primera vez que hace falta ver el directo
+  return hlsCargando ||= new Promise(res => {
+    const sc = document.createElement("script");
+    sc.src = "/vendor/hls.min.js";   // servido por el propio panel: no depende de internet
+    sc.onload = sc.onerror = () => res();
+    document.head.appendChild(sc);
+  });
+}
+const ESPERANDO = '<div class="spinner"></div>conectando con el directo…';
+let reintentarEn = 0, avisoLento = null;
+function avisoDirecto(html) { $("s-wait").hidden = false; $("s-wait").innerHTML = `<div>${html}</div>`; }
+// en vez de quedarse «conectando» para siempre, explica qué falla y reintenta
+function falloDirecto(msg) {
+  desconectarDirecto();
+  reintentarEn = Date.now() + 10000;
+  avisoDirecto(`${esc(msg)}<br><small style="color:var(--dim)">Reintento en 10 s · también puedes verlo en VLC: rtsp://${esc(location.hostname)}:8554/radio</small>`);
+}
+async function conectarDirecto() {
+  if (conectado || Date.now() < reintentarEn) return;
+  conectado = true; avisoDirecto(ESPERANDO);
+  const url = "/live/radio/index.m3u8", nativo = sv.canPlayType("application/vnd.apple.mpegurl");
+  // hls.js siempre que haya MediaSource (todos los navegadores de escritorio). El
+  // reproductor HLS propio de Chrome reciente no reproduce este directo (audio y
+  // video en pistas separadas): solo se usa el nativo en iPhone/Safari sin MSE.
+  if (!window.Hls && window.MediaSource) await cargarHls();
+  if (!conectado) return;   // se paró mientras se descargaba
+  if (window.Hls && Hls.isSupported()) {
+    if (!MediaSource.isTypeSupported('video/mp4; codecs="avc1.640028"'))
+      return falloDirecto("Este navegador no puede reproducir video H.264 (pasa en algunos Chromium o Firefox de Linux sin códecs). Prueba con Chrome o Edge.");
+    hls = new Hls({liveSyncDurationCount: 2, manifestLoadingMaxRetry: 30, manifestLoadingRetryDelay: 2000});
+    hls.loadSource(url); hls.attachMedia(sv);
+    hls.on(Hls.Events.MANIFEST_PARSED, () => sv.play().catch(() => {}));
+    hls.on(Hls.Events.ERROR, (_, d) => { if (d.fatal) falloDirecto(`No se pudo reproducir el directo (${d.details}).`); });
+  } else if (nativo) {
+    sv.src = url; sv.play().catch(() => {});
+  } else {
+    return falloDirecto(window.Hls ? "Este navegador no puede reproducir el directo." : "No se pudo cargar el reproductor del directo.");
+  }
+  clearTimeout(avisoLento);
+  avisoLento = setTimeout(() => {
+    if (conectado && sv.readyState < 3) avisoDirecto(ESPERANDO + '<br><small style="color:var(--dim)">tarda más de lo normal… si sigue así, recarga la página</small>');
+  }, 15000);
+}
+function desconectarDirecto() {
+  if (!conectado) return;
+  conectado = false;
+  if (hls) { hls.destroy(); hls = null; }
+  sv.pause(); sv.removeAttribute("src"); sv.load();
+}
+function silenciarDirecto() { sv.muted = !sv.muted; if (!sv.muted) sv.play().catch(() => {}); pintarMute(); }
+// volumen del directo en esta página (se recuerda en este navegador; no afecta a lo que se emite)
+try { sv.volume = +(localStorage.getItem("volDirecto") ?? .8); } catch { sv.volume = .8; }
+setRange($("s-vol"), sv.volume);
+$("s-vol").addEventListener("input", e => {
+  sv.volume = +e.target.value; setRange(e.target, sv.volume);
+  if (sv.volume > 0 && sv.muted) { sv.muted = false; sv.play().catch(() => {}); pintarMute(); }
+  try { localStorage.setItem("volDirecto", sv.volume); } catch {}
+});
+function pantallaCompleta() { const el = sv.closest(".liveplayer"); (el.requestFullscreen || el.webkitRequestFullscreen).call(el); }
+
+function verClave() { const k = $("s-key"); k.type = k.type === "password" ? "text" : "password"; }
+async function guardarClave() {
+  try { await post("/api/key", {key: $("s-key").value}); $("s-key").value = ""; toast("Clave de emisión guardada"); }
+  catch (e) { toast(e.message, true); }
+  refresh();
+}
+$("s-key").addEventListener("keydown", e => { if (e.key === "Enter") guardarClave(); });
+
+async function startStream() {
+  if (!await confirmar("¿Salir en directo?", "Empezará a emitir EN DIRECTO en tu canal de YouTube y el vigilante 24/7 la mantendrá activa.", "Emitir ahora", true)) return;
+  try { await post("/api/stream/start", {}); toast("¡Estás en directo! 🔴"); }
+  catch (e) { toast(e.message, true); }
+  refresh();
+}
+
+async function startLocal() {
+  try { await post("/api/stream/start", {mode: "local"}); toast("Vista previa en marcha: ábrela en VLC"); }
+  catch (e) { toast(e.message, true); }
+  refresh();
+}
+
+async function stopStream() {
+  await post("/api/stream/stop").catch(() => {});
+  toast("Emisión detenida");
+  refresh();
+}
+
+$("pb-play").innerHTML = ICON_PLAY;
+refresh();
+setInterval(() => { if (!document.hidden) refresh(); }, 3000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+</script>
+</body>
+</html>

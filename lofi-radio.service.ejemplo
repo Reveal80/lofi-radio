@@ -1,0 +1,13 @@
+[Unit]
+Description=Panel de gestion Radio Lofi 24/7
+After=network.target
+
+[Service]
+WorkingDirectory=/root/lofi-radio
+Environment=PORT=8750
+ExecStart=/usr/bin/python3 /root/lofi-radio/app.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

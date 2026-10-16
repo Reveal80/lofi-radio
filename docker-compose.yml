@@ -1,0 +1,60 @@
+# Registros de Docker con tope: como máximo 5 MB por contenedor (al llenarse se
+# descarta lo más antiguo). Los registros de la app se vacían cada 24 h (app.py).
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "5m"
+    max-file: "1"
+
+services:
+  python:
+    image: python:3.12-slim
+    container_name: lofi-python
+    logging: *logging
+    working_dir: /app
+    environment:
+      PORT: 8750
+      PYTHONUNBUFFERED: 1
+    volumes:
+      - ./:/app
+      - pip-cache:/root/.cache/pip
+    # Sin Dockerfile: instala ffmpeg y las librerías (versiones fijas) solo si faltan
+    command: >
+      sh -c "command -v ffmpeg >/dev/null || (apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*);
+             python -c 'import flask, numpy, scipy' 2>/dev/null || pip install -q flask==3.1.3 numpy==2.5.4 scipy==1.18.1;
+             exec python app.py"
+    depends_on:
+      - mediamtx
+    expose:
+      - "8750"
+    restart: unless-stopped
+
+  mediamtx:
+    # servidor de streaming de la red local (VLC: rtsp://IP:8554/radio; web: HLS)
+    image: bluenviron/mediamtx:1.9.3
+    container_name: lofi-mediamtx
+    logging: *logging
+    # HLS para ver el directo dentro del panel (Apache lo sirve en /live/)
+    environment:
+      MTX_HLSVARIANT: fmp4
+      MTX_HLSALWAYSREMUX: "yes"
+      MTX_HLSSEGMENTDURATION: 1s
+    ports:
+      - "${PREVIEW_PORT:-8554}:8554"
+    restart: unless-stopped
+
+  apache:
+    image: php:8.3-apache
+    container_name: lofi-apache
+    logging: *logging
+    depends_on:
+      - python
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    volumes:
+      - ./apache/radio.conf:/etc/apache2/sites-available/000-default.conf:ro
+    command: sh -c "a2enmod proxy proxy_http >/dev/null && exec apache2-foreground"
+    restart: unless-stopped
+
+volumes:
+  pip-cache:

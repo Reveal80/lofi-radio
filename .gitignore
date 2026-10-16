@@ -1,0 +1,11 @@
+# datos de ejecución y secretos: nunca al repositorio
+data/
+logs/
+config.json
+__pycache__/
+*.pyc
+*.part
+
+# archivos de trabajo de Claude
+CLAUDE.md
+.claude/

@@ -1,0 +1,14 @@
+# Nada de datos, registros, configuración con claves ni archivos de Claude
+data/
+logs/
+config.json
+__pycache__/
+*.pyc
+CLAUDE.md
+.claude/
+*.md
+lofi-radio.service.ejemplo
+Dockerfile
+.dockerignore
+docker-compose.yml
+hub-readme.py
