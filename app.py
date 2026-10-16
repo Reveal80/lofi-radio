@@ -312,26 +312,45 @@ def video_job(tipo, cantidad):
         video_state["running"] = False
 
 
-def transcode_job(src, nombre):
-    """Convierte el video subido a MP4 h264 sin audio (máx. 1080p) para la biblioteca."""
+def transcode_job(src, nombre, video=None):
+    """Guarda el video subido en la biblioteca como MP4 h264 sin audio (máx. 1080p).
+    Si ya es h264 yuv420p de 1080p o menos se copia tal cual (sin perder calidad);
+    si no, se recodifica con calidad alta (crf 17)."""
+    destino = libre(VIDEOS_DIR, nombre, ".mp4", "video")
+    titulo = nombre.replace("_", " ").strip()[:80]
+    v = video or {}
+    copiable = (v.get("codec_name") == "h264" and v.get("pix_fmt") == "yuv420p"
+                and (v.get("width") or 9999) <= 1920 and (v.get("height") or 9999) <= 1080)
     try:
-        _convertir(["ffmpeg", "-y", "-loglevel", "error", "-i", str(src),
-                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
-                    "-vf", "scale='min(1920,iw)':-2,format=yuv420p", "-an"],
-                   libre(VIDEOS_DIR, nombre, ".mp4", "video"), nombre.replace("_", " ").strip()[:80])
+        if copiable:
+            _convertir(["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-map", "0:v:0",
+                        "-c:v", "copy", "-an", "-movflags", "+faststart"], destino, titulo, terminar=False)
+            if destino.exists():
+                return
+            video_state["error"] = ""   # la copia no fue posible (contenedor raro): se recodifica
+        _convertir(["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-map", "0:v:0",
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "17",
+                    "-vf", "scale='min(1920,iw)':-2,format=yuv420p", "-an", "-movflags", "+faststart"],
+                   destino, titulo)
     finally:
+        video_state["running"] = False
         src.unlink(missing_ok=True)
 
 
 def audio_job(src, nombre, etiquetas):
-    """Convierte el audio subido a MP3 (44,1 kHz estéreo) para la biblioteca de música."""
+    """Guarda el audio subido como MP3 en la biblioteca de música. Un MP3 se copia tal cual
+    (sin recodificar: no pierde calidad); otros formatos se convierten a 320 kbit/s."""
     parcial = None
     try:
         titulo = (etiquetas.get("title") or nombre.replace("_", " ").replace("-", " ")).strip()[:80]
         mp3 = libre(TRACKS_DIR, titulo, ".mp3", "cancion")
         parcial = mp3.with_suffix(".part")
-        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-vn", "-ac", "2", "-ar", "44100",
-                        "-b:a", "192k", "-metadata", f"title={titulo}",
+        if etiquetas.get("_codec") == "mp3":
+            codec = ["-c:a", "copy"]
+        else:
+            codec = ["-ac", "2", "-ar", "44100", "-b:a", "320k"]
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-map", "0:a:0", "-vn", *codec,
+                        "-map_metadata", "-1", "-id3v2_version", "3", "-metadata", f"title={titulo}",
                         "-metadata", f"album=Tema {etiquetas.get('artist') or 'subida'}",
                         "-f", "mp3", str(parcial)], check=True, capture_output=True, text=True)
         parcial.replace(mp3)   # aparece en la lista solo cuando está completo
@@ -344,6 +363,15 @@ def audio_job(src, nombre, etiquetas):
             parcial.unlink(missing_ok=True)   # solo el suyo: puede haber una composición en curso
         src.unlink(missing_ok=True)
         video_state["running"] = False
+
+
+_GENERICO = re.compile(r"^\s*\d[\d.,\s]*\s*(pistas|tracks|canciones)|libres? de regal|royalty[- ]free|^\s*pixabay", re.I)
+
+
+def titulo_generico(t):
+    """True si el título es el encabezado de una lista de Pixabay («18 123 pistas de música
+    lofi libres de regalías») en vez del nombre de una canción."""
+    return not t or bool(_GENERICO.search(str(t)))
 
 
 def _repartir(tmp, nombre, titulo=""):
@@ -361,12 +389,16 @@ def _repartir(tmp, nombre, titulo=""):
     hay_audio = any(p.get("codec_type") == "audio" for p in pistas)
     if hay_video:
         video_state["destino"] = "video"
-        threading.Thread(target=transcode_job, args=(tmp, nombre), daemon=True).start()
+        v = next(p for p in pistas if p.get("codec_type") == "video" and not p.get("disposition", {}).get("attached_pic"))
+        threading.Thread(target=transcode_job, args=(tmp, nombre, v), daemon=True).start()
         return "video"
     if hay_audio:
         video_state["destino"] = "musica"
         etiquetas = {k.lower(): v for k, v in info.get("format", {}).get("tags", {}).items()}
-        if titulo:
+        etiquetas["_codec"] = next(p.get("codec_name") for p in pistas if p.get("codec_type") == "audio")
+        if titulo_generico(etiquetas.get("title")):
+            etiquetas.pop("title", None)   # p. ej. «18 123 pistas de música lofi…» de una importación antigua
+        if titulo and not titulo_generico(titulo):
             etiquetas["title"] = titulo
         threading.Thread(target=audio_job, args=(tmp, nombre, etiquetas), daemon=True).start()
         return "musica"

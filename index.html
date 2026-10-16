@@ -583,7 +583,7 @@
       </form>
       <div class="pxmark">
         <div><b>Importar con un clic desde Pixabay</b>
-          <small>1) Arrastra este botón a tu barra de marcadores. 2) En la página de una canción de Pixabay, pulsa el marcador: la canción se importa sola.</small></div>
+          <small>1) Arrastra este botón a tu barra de marcadores. 2) En Pixabay, abre la página de la canción (o dale a ▶ en la lista) y pulsa el marcador: se importa con su título y sin recodificar.</small></div>
         <a class="btn sm primary" id="px-mark" href="#" onclick="event.preventDefault(); toast('Arrástralo a la barra de marcadores (no hace falta pulsarlo aquí)')">⤓ Importar a Radio Lofi</a>
       </div>
       <label class="drop" id="px-drop" style="margin-top:10px">
@@ -1233,11 +1233,27 @@ function buscarPixabay(e) { e.preventDefault(); abrirBusqueda($("px-q").value); 
 // busca el audio de la canción y abre el panel con #importar=<enlace>&titulo=<nombre>
 function marcadorPixabay(o) {
   const h = document.documentElement.innerHTML.replace(/\\u002F/gi, "/").replace(/\\\//g, "/");
-  const a = [...document.querySelectorAll("audio,source")].map(x => x.currentSrc || x.src || "")
-    .find(u => /cdn\.pixabay\.com\/audio\//.test(u));
-  const m = a || (h.match(/https:\/\/cdn\.pixabay\.com\/audio\/[^"'\s<>\\]+?\.mp3/) || [])[0];
+  const esCdn = u => /cdn\.pixabay\.com\/audio\//.test(u || "");
+  const limpio = x => (x || "").replace(/\s+/g, " ").trim();
+  // encabezados de lista («18 123 pistas de música lofi libres de regalías») no valen como título
+  const generico = x => !x || /^\d[\d.,\s]*\s*(pistas|tracks|canciones)|libres? de regal|royalty[- ]free|^pixabay/i.test(x);
+  const medios = [...document.querySelectorAll("audio,source")].filter(x => esCdn(x.currentSrc || x.src));
+  const el = medios.find(x => !(x.closest("audio") || x).paused) || medios[0];
+  const m = (el && (el.currentSrc || el.src)) || (h.match(/https:\/\/cdn\.pixabay\.com\/audio\/[^"'\s<>\\]+?\.mp3/) || [])[0];
   if (!m) { alert("Radio Lofi: no encuentro el audio de esta página. Pulsa ▶ en la canción y vuelve a pulsar el marcador."); return; }
-  const t = ((document.querySelector("h1") || {}).textContent || document.title).trim();
+  let t = "";
+  // 1) página de una canción: el h1 es su título
+  if (/\/music\/[^/]*\d+\/?$/.test(location.pathname)) t = limpio((document.querySelector("h1") || {}).textContent);
+  // 2) lista de resultados: el enlace a la canción más cercano al reproductor que suena (o a su botón de pausa)
+  const inicios = [el && (el.closest("audio") || el), document.querySelector('[aria-label*="pausa" i],[aria-label*="pause" i],[title*="pausa" i],[title*="pause" i]')];
+  for (const ini of inicios) for (let n = ini, i = 0; n && i < 10 && generico(t); n = n.parentElement, i++) {
+    const a = [...n.querySelectorAll('a[href*="/music/"]')].map(x => limpio(x.textContent)).find(x => !generico(x));
+    if (a) t = a;
+  }
+  // 3) nombre del archivo (?filename=lofi-chill-573883.mp3) o título de la pestaña
+  if (generico(t)) { const f = (m.match(/[?&]filename=([^&]+)/) || [])[1]; if (f) t = limpio(decodeURIComponent(f).replace(/\.mp3$/i, "").replace(/-\d+$/, "").replace(/[-_]+/g, " ")); }
+  if (generico(t)) t = limpio(document.title.split(/[|–-]/)[0]);
+  if (generico(t)) t = "";
   window.open(o + "/#importar=" + encodeURIComponent(m) + "&titulo=" + encodeURIComponent(t), "radiolofi");
 }
 const MARCADOR = "(" + marcadorPixabay.toString() + ")(" + JSON.stringify(location.origin) + ")";
