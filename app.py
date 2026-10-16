@@ -365,16 +365,19 @@ def audio_job(src, nombre, etiquetas):
         video_state["running"] = False
 
 
-_GENERICO = re.compile(r"^\s*\d[\d.,\s]*\s*(pistas|tracks|canciones)|libres? de regal|royalty[- ]free|^\s*pixabay", re.I)
+_GENERICO = re.compile(r"^\s*\d[\d.,\s]*\s*(pistas|tracks|canciones)|regal[ií]as|derechos de autor"
+                       r"|libres? de derechos|royalty|copyright|^\s*pixabay|^\s*música |^\s*music\s*$", re.I)
 
 
 def titulo_generico(t):
-    """True si el título es el encabezado de una lista de Pixabay («18 123 pistas de música
-    lofi libres de regalías») en vez del nombre de una canción."""
-    return not t or bool(_GENERICO.search(str(t)))
+    """True si el título es un encabezado o frase SEO de Pixabay («18 123 pistas de música lofi
+    libres de regalías», «Música lofi relajante, lofi sin derechos de autor y fondo…») en vez
+    del nombre de una canción: muy largo, con lista de comas o con esas palabras."""
+    t = " ".join(str(t or "").split())
+    return not t or len(t) > 60 or t.count(",") > 1 or bool(_GENERICO.search(t))
 
 
-def _repartir(tmp, nombre, titulo=""):
+def _repartir(tmp, nombre, titulo="", artista=""):
     """Analiza el archivo recibido y lo manda a Música o a Videos.
     Un MP3 con carátula trae una «imagen adjunta», no un video: va a Música."""
     try:
@@ -400,6 +403,10 @@ def _repartir(tmp, nombre, titulo=""):
             etiquetas.pop("title", None)   # p. ej. «18 123 pistas de música lofi…» de una importación antigua
         if titulo and not titulo_generico(titulo):
             etiquetas["title"] = titulo
+        if artista:
+            etiquetas["artist"] = artista
+            if etiquetas.get("title"):      # como lo quiere el usuario: «Tokyo Lofi - ZephiraMusic»
+                etiquetas["title"] = f"{etiquetas['title']} - {artista}"
         threading.Thread(target=audio_job, args=(tmp, nombre, etiquetas), daemon=True).start()
         return "musica"
     tmp.unlink(missing_ok=True)
@@ -443,7 +450,8 @@ MAX_IMPORTAR = 150 * 1024 ** 2
 def api_importar():
     datos = request.get_json(force=True)
     url = str(datos.get("url", "")).strip()
-    titulo = " ".join(str(datos.get("titulo", "")).split())[:80]   # lo manda el marcador desde la página
+    titulo = " ".join(str(datos.get("titulo", "")).split())[:80]   # los manda el marcador desde la página
+    artista = " ".join(str(datos.get("artista", "")).split())[:60]
     u = urllib.parse.urlparse(url)
     if u.hostname and u.hostname.endswith("pixabay.com") and "/music/" in u.path:
         return jsonify(error="ese es el enlace de la página: Pixabay no deja leerla desde el servidor. "
@@ -469,7 +477,7 @@ def api_importar():
     # nombre: el de «?filename=…» si viene, si no el del archivo
     nombre = urllib.parse.parse_qs(u.query).get("filename", [Path(u.path).stem])[0]
     nombre = re.sub(r"[-_]\d{4,}$", "", Path(nombre).stem)   # quita el número final de Pixabay
-    tipo = _repartir(tmp, nombre, titulo)
+    tipo = _repartir(tmp, nombre, titulo, artista)
     if not tipo:
         return jsonify(error="el enlace no contiene audio válido"), 400
     return jsonify(ok=True, tipo=tipo)
