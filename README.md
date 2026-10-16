@@ -139,7 +139,8 @@ ponle delante un proxy con autenticación o una VPN.
 
 - Unos 1,5 núcleos de CPU mientras emite (codificación h264 a 1080p y 30 fps por software).
 - Alrededor de 1 GB de RAM.
-- Subida a Internet de al menos 6 Mbit/s para YouTube a 1080p.
+- Subida a Internet de unos 9 Mbit/s para YouTube a 1080p (la emisión va a 6800 kbps, lo que
+  recomienda YouTube; se puede bajar con `"video_kbps": 4500` en `data/config.json`).
 
 ## Seguridad y privacidad
 

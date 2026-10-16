@@ -23,7 +23,7 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 import escenas
 import lofigen
 
-VERSION = "1.4"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
+VERSION = "1.5"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
 BASE = Path(__file__).parent
 TRACKS_DIR = BASE / "data" / "tracks"
 VIDEOS_DIR = BASE / "data" / "videos"    # biblioteca de videos + cola
@@ -625,7 +625,15 @@ def start_stream(local=False):
     ver y escuchar con VLC exactamente lo mismo que recibe YouTube.
     local=True emite solo a la red local (sin YouTube)."""
     with _stream_lock:
-        key = load_config().get("rtmp_key", "")
+        cfg = load_config()
+        key = cfg.get("rtmp_key", "")
+        # tasa de bits del video: YouTube recomienda 4500-9000 kbps para 1080p30 (avisa por debajo
+        # de 6800). Configurable en config.json («video_kbps») por si la subida no da para tanto.
+        try:
+            kbps = int(cfg.get("video_kbps") or 6800)
+        except (TypeError, ValueError):
+            kbps = 6800
+        kbps = min(max(kbps, 1000), 12000)
         if stream_running():
             return "la emisión ya está en marcha"
         if not any((VIDEOS_DIR / c["video"]).exists() for c in load_cola() if c.get("activo") is not False):
@@ -649,8 +657,8 @@ def start_stream(local=False):
         enc = (f'ffmpeg -y -stats_period 5 -thread_queue_size 8 -f rawvideo -pix_fmt yuv420p -s 1920x1080 '
                f'-r 30 -i pipe:3 -thread_queue_size 48 '
                f'-f s16le -ar 44100 -ac 2 -i pipe:0 -map 0:v -map 1:a '
-               f'-c:v libx264 -preset veryfast -b:v 2500k -maxrate 2500k '
-               f'-bufsize 5000k -g 60 -r 30 -c:a aac -b:a 128k -ar 44100 '
+               f'-c:v libx264 -preset veryfast -b:v {kbps}k -maxrate {kbps}k '
+               f'-bufsize {kbps * 2}k -g 60 -r 30 -c:a aac -b:a 160k -ar 44100 '
                f'-flags +global_header -f tee "{"|".join(salidas)}"')
         if stream["log_fh"]:
             stream["log_fh"].close()
