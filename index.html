@@ -53,6 +53,7 @@
   .logo svg { width: 17px; height: 17px; }
   .brand h1 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
   .brand small { font: 500 10px var(--mono); color: var(--dim); letter-spacing: .14em; text-transform: uppercase; }
+  .brand .ver { font-size: 9px; letter-spacing: .04em; text-transform: none; color: var(--dim); opacity: .8; margin-left: 4px; }
   .stats { display: flex; gap: 8px; margin-left: auto; }
   .stat {
     display: flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 99px;
@@ -325,7 +326,6 @@
   .pb-seek { display: flex; align-items: center; gap: 10px; width: 100%; font: 11px var(--mono); color: var(--muted);
              font-variant-numeric: tabular-nums; }
   .pb-right { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-  .ver { font-size: 11px; color: var(--dim); margin-left: 10px; white-space: nowrap; font-variant-numeric: tabular-nums; }
   input[type=range] { -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; flex: 1;
                       height: 16px; --p: 0%; }
   input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 99px;
@@ -561,7 +561,7 @@
 <header class="topbar">
   <div class="brand">
     <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#1a0f20" stroke-width="2.2" stroke-linecap="round"><path d="M4 12a8 8 0 0 1 16 0"/><path d="M8 12a4 4 0 0 1 8 0"/><circle cx="12" cy="12" r="1.2" fill="#1a0f20"/><path d="M12 13v7"/></svg></div>
-    <h1>Radio Lofi 24/7</h1><small>panel de gestión</small>
+    <h1>Radio Lofi 24/7</h1><small>panel de gestión <span class="ver" id="ver" title="Versión de Radio Lofi"></span></small>
   </div>
   <div class="compose-wrap pixa-wrap" id="px-wrap">
     <button class="logbtn" id="px-open" onclick="abrirPixabay(event)" title="buscar música en Pixabay e importarla">
@@ -801,7 +801,6 @@
   <div class="pb-right">
     <svg class="vicon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
     <input type="range" id="vol" min="0" max="1" step="0.01" value="0.8">
-    <span class="ver" id="ver" title="Versión de Radio Lofi"></span>
   </div>
 </footer>
 
