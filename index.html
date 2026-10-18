@@ -193,12 +193,12 @@
   .pill.warn { color: var(--amber); border-color: rgba(255,179,92,.45); background: rgba(255,179,92,.1); }
 
   /* ---------- hero / reproductor central ---------- */
-  .hero { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.2fr); gap: 22px; align-items: center;
-          padding: 14px 22px; overflow: hidden; flex: none; }
+  .hero { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.2fr); gap: 16px; align-items: center;
+          padding: 7px 18px; overflow: hidden; flex: none; }   /* la mitad de alto que antes (petición del usuario) */
   .hero::before { content: ""; position: absolute; inset: -40%; z-index: -1; opacity: .5;
                   background: radial-gradient(circle at 20% 50%, hsla(var(--h,330),90%,60%,.35), transparent 45%);
                   transition: background 1s; }
-  .vinyl-wrap { position: relative; width: 86px; height: 86px; }
+  .vinyl-wrap { position: relative; width: 44px; height: 44px; }
   .vinyl {
     width: 100%; height: 100%; border-radius: 50%; position: relative;
     background: repeating-radial-gradient(circle, #111 0 2px, #1b1b1f 2px 4px);
@@ -212,14 +212,15 @@
                   display: grid; place-items: center; }
   .vinyl .label::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--bg0); }
   .playing .vinyl { animation-play-state: running; }
-  .hero-info { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .hero-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .hero-info .fila { display: flex; align-items: center; gap: 10px; min-width: 0; }
   .eyebrow { font: 500 10.5px var(--mono); letter-spacing: .22em; text-transform: uppercase; color: var(--amber); }
-  .hero-title { margin: 0; font-size: clamp(18px, 1.6vw, 26px); font-weight: 800; letter-spacing: -.02em;
+  .hero-title { margin: 0; font-size: clamp(15px, 1.25vw, 20px); font-weight: 800; letter-spacing: -.02em;
                 line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .chip { font: 500 11px var(--mono); padding: 3px 9px; border-radius: 8px; background: var(--glass-2);
           border: 1px solid var(--stroke); color: var(--muted); }
-  #viz { width: 100%; height: 70px; display: block; }
+  #viz { width: 100%; height: 42px; display: block; }
 
   /* ---------- lista de pistas ---------- */
   .tracks-card { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 20px 10px 10px; }
@@ -542,7 +543,6 @@
     .topbar { padding: 8px 12px; gap: 8px; }
     .brand small, .clock, .stat .lbl { display: none; }
     .stat { padding: 5px 9px; }
-    .vinyl-wrap { width: 86px; height: 86px; }
     .thead { display: none; }
     .track { grid-template-columns: 14px 44px minmax(0,1fr) 54px 40px; }
     .track .ttema { display: none; }
@@ -666,9 +666,9 @@
     <section class="card hero" id="hero">
       <div class="vinyl-wrap"><div class="vinyl"><div class="label"></div></div></div>
       <div class="hero-info">
-        <span class="eyebrow" id="h-eyebrow">selecciona una pista</span>
+        <div class="fila"><span class="eyebrow" id="h-eyebrow">selecciona una pista</span>
+          <div class="chips" id="h-chips"><span class="chip">lofi</span><span class="chip">hip-hop</span><span class="chip">24/7</span></div></div>
         <h2 class="hero-title" id="h-title">Música para no hacer nada</h2>
-        <div class="chips" id="h-chips"><span class="chip">lofi</span><span class="chip">hip-hop</span><span class="chip">24/7</span></div>
       </div>
       <canvas id="viz"></canvas>
     </section>
