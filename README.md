@@ -12,7 +12,8 @@ Toda la interfaz está en español.
 - **Música procedural**: ocho estilos (para estudiar, chill, jazz hop, día de lluvia, nocturno,
   ambiente, retro 8 bits y aleatorio). Cada canción es distinta y se guarda como MP3 con su título.
 - **Videos de escena**: ciudad de noche, amanecer, día, atardecer, lluvia, nieve o aurora, en bucle
-  perfecto de 20 segundos. También puedes subir tus propios MP4 o importar música de Pixabay.
+  perfecto de 20 segundos. También puedes subir tus propios MP4, imágenes fijas (se convierten en un video de 10 s
+  en bucle) o importar música de Pixabay.
 - **Cola de video**: elige qué videos se emiten, cuántas horas cada uno y en qué orden. Se puede
   cambiar en caliente sin cortar el directo.
 - **Emisión 24/7**: la salida a YouTube reconecta sola, sin límite de intentos y sin cortar la vista

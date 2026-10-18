@@ -588,7 +588,7 @@
         <a class="btn sm primary" id="px-mark" href="#" onclick="event.preventDefault(); toast('Arrástralo a la barra de marcadores (no hace falta pulsarlo aquí)')">⤓ Importar a Radio Lofi</a>
       </div>
       <label class="drop" id="px-drop" style="margin-top:10px">
-        <input type="file" accept="audio/*,.mp3" hidden id="px-file">
+        <input type="file" accept="audio/*,video/*,image/*,.mp3" hidden id="px-file">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></div>
         <div><b>…o arrastra aquí el MP3 descargado</b><small>se añade al final de Música</small></div>
       </label>
@@ -682,12 +682,12 @@
           <div class="popover uppop" id="up-pop">
             <div class="card-h"><h2>Subir a la biblioteca</h2></div>
             <label class="drop" id="v-drop">
-              <input id="v-file" type="file" accept="audio/*,video/*,.mp3,.wav,.flac,.m4a,.ogg,.mkv" hidden>
+              <input id="v-file" type="file" accept="audio/*,video/*,image/*,.mp3,.wav,.flac,.m4a,.ogg,.mkv,.jpg,.jpeg,.png,.webp" hidden>
               <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></div>
-              <div><b>Elige o arrastra música o un video</b><small id="v-fname">mp3, wav, m4a… → Música · mp4, mov, mkv… → Videos</small></div>
+              <div><b>Elige o arrastra música, un video o una imagen</b><small id="v-fname">mp3, wav… → Música · mp4, mkv… → Videos · jpg, png… → Videos (imagen fija de 10 s en bucle)</small></div>
             </label>
             <div class="progress" id="v-upprog" style="display:none; margin-top:12px"><i></i></div>
-            <p class="hint" style="margin:10px 0 0; font-size:12px">Se detecta solo: el audio va a <b>Música</b> (entra en el directo al azar) y los videos a <b>Videos</b>, desactivados hasta que actives «en bucle».</p>
+            <p class="hint" style="margin:10px 0 0; font-size:12px">Se detecta solo: el audio va a <b>Música</b> (entra en el directo al azar); los videos y las imágenes a <b>Videos</b>, desactivados hasta que actives «en bucle». Una imagen se convierte en un video fijo de 10 s sin audio, que ocupa muy poco.</p>
           </div>
         </div>
         <div class="field search">
@@ -1412,13 +1412,13 @@ function subirVideo(f) {
     let j = {}; try { j = JSON.parse(xhr.responseText); } catch {}
     proceso = xhr.status >= 400 ? {tipo: "", nombre: "", pct: 0} : {tipo: "convirtiendo", nombre: f.name, pct: 100};
     firmaLista = ""; knownTracks = "";
-    $("v-fname").textContent = "mp3, wav, m4a… → Música · mp4, mov, mkv… → Videos";
+    $("v-fname").textContent = "mp3, wav… → Música · mp4, mkv… → Videos · jpg, png… → Videos (imagen fija de 10 s en bucle)";
     if (xhr.status < 400) cerrarSubida();
     if (xhr.status >= 400) { $("v-err").textContent = j.error || xhr.statusText; toast(j.error || "No se pudo subir", true); }
     else {
       const musica = j.tipo === "musica";
       verTab(musica ? "musica" : "videos");   // se lleva al usuario a la sección donde aparecerá
-      toast(musica ? "Es audio: se añade a Música, convirtiendo…" : "Es un video: se añade a Videos, convirtiendo…");
+      toast(musica ? "Es audio: se añade a Música, convirtiendo…" : j.tipo === "imagen" ? "Es una imagen: se añade a Videos como video fijo de 10 s…" : "Es un video: se añade a Videos, convirtiendo…");
       videoRunningPrev = true;
     }
     refresh();

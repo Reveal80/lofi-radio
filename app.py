@@ -23,7 +23,7 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 import escenas
 import lofigen
 
-VERSION = "1.6"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
+VERSION = "1.7"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
 BASE = Path(__file__).parent
 TRACKS_DIR = BASE / "data" / "tracks"
 VIDEOS_DIR = BASE / "data" / "videos"    # biblioteca de videos + cola
@@ -348,6 +348,23 @@ def transcode_job(src, nombre, video=None):
         src.unlink(missing_ok=True)
 
 
+IMAGENES = {"mjpeg", "png", "webp", "bmp", "tiff", "ppm", "pgm", "pam"}   # códecs con los que ffprobe ve una imagen
+
+
+def imagen_job(src, nombre):
+    """Convierte una imagen fija en un video de 10 s sin audio para la biblioteca (ocupa muy poco:
+    es un solo fotograma repetido). Se escala a 1080p y se rellena con negro si no es 16:9."""
+    try:
+        _convertir(["ffmpeg", "-y", "-loglevel", "error", "-loop", "1", "-framerate", "30", "-i", str(src),
+                    "-t", "10", "-vf", "scale=1920:1080:force_original_aspect_ratio=decrease,"
+                    "pad=1920:1080:(ow-iw)/2:(oh-ih)/2,format=yuv420p",
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "17", "-tune", "stillimage", "-g", "30",
+                    "-an", "-movflags", "+faststart"],
+                   libre(VIDEOS_DIR, nombre, ".mp4", "imagen"), nombre.replace("_", " ").strip()[:80])
+    finally:
+        src.unlink(missing_ok=True)
+
+
 def audio_job(src, nombre, etiquetas):
     """Guarda el audio subido como MP3 en la biblioteca de música. Un MP3 se copia tal cual
     (sin recodificar: no pierde calidad); otros formatos se convierten a 320 kbit/s."""
@@ -406,6 +423,10 @@ def _repartir(tmp, nombre, titulo="", artista=""):
         v = next(p for p in pistas if p.get("codec_type") == "video" and not p.get("disposition", {}).get("attached_pic"))
         threading.Thread(target=transcode_job, args=(tmp, nombre, v), daemon=True).start()
         return "video"
+    if not hay_audio and any(p.get("codec_type") == "video" and p.get("codec_name") in IMAGENES for p in pistas):
+        video_state["destino"] = "video"
+        threading.Thread(target=imagen_job, args=(tmp, nombre), daemon=True).start()
+        return "imagen"
     if hay_audio:
         video_state["destino"] = "musica"
         etiquetas = {k.lower(): v for k, v in info.get("format", {}).get("tags", {}).items()}
@@ -446,7 +467,7 @@ def api_subir():
     f.save(tmp)
     tipo = _repartir(tmp, Path(f.filename or "archivo").stem)
     if not tipo:
-        return jsonify(error="no es un archivo de audio ni de video válido"), 400
+        return jsonify(error="no es un archivo de audio, video ni imagen válido"), 400
     return jsonify(ok=True, tipo=tipo)
 
 
@@ -467,8 +488,8 @@ def api_importar():
     if u.hostname and u.hostname.endswith("pixabay.com") and "/music/" in u.path:
         return jsonify(error="ese es el enlace de la página: Pixabay no deja leerla desde el servidor. "
                              "Usa el marcador «Importar a Radio Lofi» estando en esa página."), 400
-    if u.scheme != "https" or u.hostname != PIXABAY_CDN or not u.path.startswith("/audio/"):
-        return jsonify(error="pega el enlace del audio de Pixabay (empieza por https://cdn.pixabay.com/audio/…)"), 400
+    if u.scheme != "https" or u.hostname != PIXABAY_CDN or not u.path.startswith(("/audio/", "/photo/", "/video/")):
+        return jsonify(error="pega el enlace del archivo de Pixabay (empieza por https://cdn.pixabay.com/audio/…, /photo/… o /video/…)"), 400
     if not _ocupar():
         return jsonify(error="ya se está procesando otro archivo; espera a que termine"), 409
     tmp = VIDEOS_DIR / "subida_tmp"
@@ -490,7 +511,7 @@ def api_importar():
     nombre = re.sub(r"[-_]\d{4,}$", "", Path(nombre).stem)   # quita el número final de Pixabay
     tipo = _repartir(tmp, nombre, titulo, artista)
     if not tipo:
-        return jsonify(error="el enlace no contiene audio válido"), 400
+        return jsonify(error="el enlace no contiene audio, video ni imagen válidos"), 400
     return jsonify(ok=True, tipo=tipo)
 
 
