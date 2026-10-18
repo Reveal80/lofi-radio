@@ -510,6 +510,8 @@
              background: rgba(0,0,0,.2); border: 1px solid var(--stroke); font-size: 12px; color: var(--muted); }
   .vlcline b { font: 12px var(--mono); color: var(--ink); user-select: all; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .vlcline .iconbtn { width: 26px; height: 26px; margin-left: auto; flex: none; }
+  .ytline .ytopen { padding: 4px 10px; font-size: 12px; border-radius: 8px; margin-left: auto; flex: none; text-decoration: none; }
+  .ytline .ytopen + .iconbtn { margin-left: 0; }
   .vlcline .iconbtn svg { width: 14px; height: 14px; }
   .stream-card .watch { margin-top: 10px; padding: 10px 12px; font-size: 12px; }
 
@@ -778,6 +780,12 @@
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex:none"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
         VLC<b id="s-vlcurl"></b>
         <button class="iconbtn" onclick="copiarVlc()" title="copiar enlace"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
+      </div>
+      <div class="vlcline ytline" id="s-yt">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="flex:none; color:#ff4d4d"><path d="M23 7.1a3 3 0 0 0-2.1-2.1C19 4.5 12 4.5 12 4.5s-7 0-8.9.5A3 3 0 0 0 1 7.1 31 31 0 0 0 .5 12a31 31 0 0 0 .5 4.9 3 3 0 0 0 2.1 2.1c1.9.5 8.9.5 8.9.5s7 0 8.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .5-4.9 31 31 0 0 0-.5-4.9zM9.8 15.5v-7l6 3.5z"/></svg>
+        YouTube<b id="s-yturl" title="">añade el enlace de tu canal o directo</b>
+        <a class="btn sm primary ytopen" id="s-ytopen" href="#" target="_blank" rel="noopener" hidden title="Abrir tu canal o directo de YouTube en otra pestaña">Abrir</a>
+        <button class="iconbtn" id="s-ytedit" onclick="editarYoutube()" title="guardar o cambiar el enlace de YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
       </div>
       <div class="btnpair">
         <button id="s-live" class="btn live" onclick="startStream()">
@@ -1179,6 +1187,9 @@ async function refresh() {
   $("s-live").disabled = s.stream.running || !s.has_key;
   $("s-local").disabled = s.stream.running;
   $("s-vlc").hidden = !s.stream.running;
+  youtubeUrl = s.youtube_url || "";
+  $("s-yturl").textContent = youtubeUrl ? youtubeUrl.replace(/^https:\/\/(www\.)?/, "") : "añade el enlace de tu canal o directo";
+  $("s-yturl").title = youtubeUrl; $("s-ytopen").href = youtubeUrl || "#"; $("s-ytopen").hidden = !youtubeUrl;
   $("s-vlcurl").textContent = `rtsp://${location.hostname}:8554/radio`;
   $("s-stop").disabled = !s.stream.running;
   $("s-box").className = "broadcast" + (live ? " live" : local ? " test" : "") + (s.stream.running ? " conplayer" : "");
@@ -1224,6 +1235,15 @@ function abrirLogs() {
 }
 function cerrarLogs() { $("logs").classList.remove("open"); $("logbtn").classList.remove("on"); clearInterval(logTimer); }
 function copiarLog() { navigator.clipboard?.writeText($("s-log").textContent).then(() => toast("Log copiado"), () => toast("No se pudo copiar", true)); }
+let youtubeUrl = "";
+async function editarYoutube() {
+  const url = prompt("Enlace de tu canal o de tu directo de YouTube (vacío para quitarlo):", youtubeUrl || "https://www.youtube.com/@");
+  if (url === null) return;
+  try {
+    await post("/api/youtube_url", {url: url.trim()});
+    toast(url.trim() ? "Enlace de YouTube guardado" : "Enlace de YouTube quitado"); refresh();
+  } catch (e) { toast(e.message, true); }
+}
 function copiarVlc() { navigator.clipboard?.writeText($("s-vlcurl").textContent).then(() => toast("Enlace de VLC copiado"), () => toast("No se pudo copiar", true)); }
 document.addEventListener("keydown", e => {
   if (e.key !== "Escape") return;

@@ -23,7 +23,7 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 import escenas
 import lofigen
 
-VERSION = "1.8"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
+VERSION = "1.9"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
 BASE = Path(__file__).parent
 TRACKS_DIR = BASE / "data" / "tracks"
 VIDEOS_DIR = BASE / "data" / "videos"    # biblioteca de videos + cola
@@ -601,6 +601,16 @@ def api_aleatorio():
     return jsonify(ok=True, aleatorio=activo)
 
 
+@app.post("/api/youtube_url")
+def api_youtube_url():
+    """Enlace del canal o del directo de YouTube para el botón «Abrir» del panel (vacío = quitar)."""
+    url = str(request.get_json(force=True).get("url", "")).strip()
+    if url and not re.fullmatch(r"https://(www\.|m\.)?(youtube\.com|youtu\.be)/\S{1,200}", url):
+        return jsonify(error="pega un enlace de YouTube (https://www.youtube.com/@tu-canal, /channel/…, /live/…)"), 400
+    actualizar_config(youtube_url=url)
+    return jsonify(ok=True, youtube_url=url)
+
+
 @app.post("/api/cola/saltar")
 def api_cola_saltar():
     if not stream_running():
@@ -902,6 +912,7 @@ def api_state():
                 "reinicios": watchdog["reinicios"], "ultimo": watchdog["ultimo"]},
         has_key=bool(cfg.get("rtmp_key")),
         aleatorio=bool(cfg.get("aleatorio")),
+        youtube_url=str(cfg.get("youtube_url") or ""),
         version=VERSION,
         tracks=tracks)
 
