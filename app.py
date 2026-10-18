@@ -844,6 +844,13 @@ def _limpiar_logs():
 threading.Thread(target=_limpiar_logs, daemon=True).start()
 
 
+@app.get("/api/key")
+def api_key_ver():
+    """Devuelve la clave guardada para el botón del ojo del panel (solo red local, sin contraseña,
+    como el resto del panel; el usuario lo pidió así)."""
+    return jsonify(key=load_config().get("rtmp_key", ""))
+
+
 @app.post("/api/key")
 def api_key():
     key = request.get_json(force=True).get("key", "").strip()

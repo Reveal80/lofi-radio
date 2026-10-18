@@ -1815,9 +1815,21 @@ $("s-vol").addEventListener("input", e => {
 });
 function pantallaCompleta() { const el = sv.closest(".liveplayer"); (el.requestFullscreen || el.webkitRequestFullscreen).call(el); }
 
-function verClave() { const k = $("s-key"); k.type = k.type === "password" ? "text" : "password"; }
+async function verClave() {
+  // el ojo muestra la clave guardada (el campo se vacía al guardar, así que se pide al servidor)
+  const k = $("s-key");
+  if (k.type === "password") {
+    if (!k.value) {
+      try { k.value = (await api("/api/key")).key || ""; } catch {}
+      if (!k.value) return toast("No hay ninguna clave guardada todavía");
+    }
+    k.type = "text";
+  } else {
+    k.type = "password";
+  }
+}
 async function guardarClave() {
-  try { await post("/api/key", {key: $("s-key").value}); $("s-key").value = ""; toast("Clave de emisión guardada"); }
+  try { await post("/api/key", {key: $("s-key").value}); $("s-key").value = ""; $("s-key").type = "password"; toast("Clave de emisión guardada"); }
   catch (e) { toast(e.message, true); }
   refresh();
 }
