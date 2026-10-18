@@ -11,8 +11,10 @@ Ficheros de control (en la carpeta de videos):
                los que tienen activo=false no se emiten
   actual.json  lo que está sonando ahora (lo escribe este proceso)
   saltar       si existe, pasa al siguiente video y lo borra
+  aleatorio    si existe, el siguiente video se elige al azar (modo aleatorio del panel)
 """
 import json
+import random
 import subprocess
 import sys
 import time
@@ -22,6 +24,7 @@ W, H, FPS = 1920, 1080, 30
 FRAME = W * H * 3 // 2
 D = Path(sys.argv[1])
 COLA, ACTUAL, SALTAR = D / "cola.json", D / "actual.json", D / "saltar"
+ALEATORIO = D / "aleatorio"
 NEGRO = bytes([16]) * (W * H) + bytes([128]) * (W * H // 2)
 out = sys.stdout.buffer
 
@@ -112,6 +115,8 @@ def main():
         # el siguiente al que sonaba; si se acaba de quitar de la cola, el que ocupa su sitio
         pos = (ids.index(actual_id) + 1) if actual_id in ids else (pos if actual_id else 0)
         pos %= len(cola)
+        if ALEATORIO.exists() and len(cola) > 1:   # al azar, sin repetir el que acaba de emitirse
+            pos = random.choice([k for k in range(len(cola)) if ids[k] != actual_id])
         item = cola[pos]
         actual_id = item["id"]
         if not (D / item["video"]).exists() or not reproducir(item):

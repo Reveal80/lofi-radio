@@ -10,8 +10,10 @@ Ficheros de control (en la carpeta de canciones):
   orden.json   orden de emisión (lo escribe el panel); las nuevas van al final
   actual.json  canción que suena ahora (la escribe este proceso)
   saltar       si existe, pasa a la siguiente canción y lo borra
+  aleatorio    si existe, la siguiente canción se elige al azar (modo aleatorio del panel)
 """
 import json
+import random
 import subprocess
 import sys
 import time
@@ -19,6 +21,7 @@ from pathlib import Path
 
 D = Path(sys.argv[1])
 ACTUAL, SALTAR, ORDEN = D / "actual.json", D / "saltar", D / "orden.json"
+ALEATORIO = D / "aleatorio"
 MUESTRA = 4                      # bytes por muestra estéreo s16le
 SILENCIO = bytes(44100 * MUESTRA // 10)   # 0,1 s
 out = sys.stdout.buffer
@@ -97,6 +100,8 @@ def main():
         # (si la que sonaba se ha borrado, la que ocupa ahora su sitio)
         pos = (nombres.index(actual) + 1) if actual in nombres else (pos if actual else 0)
         pos %= len(pistas)
+        if ALEATORIO.exists() and len(pistas) > 1:   # al azar, sin repetir la que acaba de sonar
+            pos = random.choice([k for k in range(len(pistas)) if nombres[k] != actual])
         actual = nombres[pos]
         reproducir(pistas[pos])
 

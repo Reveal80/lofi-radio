@@ -387,7 +387,10 @@
   [hidden] { display: none !important; }
 
   /* ---------- música: canción del directo ---------- */
-  .mtools { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; padding: 0 10px 12px; }
+  .mtools { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 10px; padding: 0 10px 12px; }
+  .btn.shuffle { padding: 0; width: 40px; align-self: stretch; justify-content: center; color: var(--muted); }
+  .btn.shuffle svg { width: 17px; height: 17px; }
+  .btn.shuffle.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
   .mlive { position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 14px; overflow: hidden;
            background: rgba(0,0,0,.25); border: 1px solid var(--stroke); }
   .mlive.on { border-color: rgba(255,77,109,.45); background: linear-gradient(90deg, rgba(255,77,109,.14), rgba(0,0,0,.2) 70%); }
@@ -719,6 +722,9 @@
           </div>
           <button class="btn" id="q-skip" onclick="saltarVideo()" title="Pasa al siguiente video en bucle sin cortar el directo">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg>Siguiente video
+          </button>
+          <button class="btn sm shuffle" id="q-shuffle" onclick="alternarAleatorio()" title="Activa el modo aleatorio: los videos en bucle y la música sonarán en orden aleatorio" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
           </button>
         </div>
         <div style="padding:0 10px"><p id="v-err" class="err" style="margin:0 0 10px"></p></div>
@@ -1180,6 +1186,8 @@ async function refresh() {
   $("s-badge").textContent = live ? "● EN DIRECTO" : "● VISTA PREVIA";
   $("s-badge").className = "pill badge " + (live ? "live" : "warn");
   $("q-skip").disabled = !s.stream.running;
+  $("q-shuffle").classList.toggle("on", !!s.aleatorio); $("q-shuffle").setAttribute("aria-pressed", String(!!s.aleatorio));
+  $("q-shuffle").title = s.aleatorio ? "Modo aleatorio activado: videos y música suenan en orden aleatorio. Pulsa para volver al orden de las listas" : "Activa el modo aleatorio: los videos en bucle y la música sonarán en orden aleatorio";
   if (s.stream.running) conectarDirecto(); else desconectarDirecto();
   $("s-big").textContent = live ? "EN DIRECTO" : local ? "VISTA PREVIA" : "FUERA DE AIRE";
   $("s-msg").textContent = live ? "emitiendo a YouTube y a la red local"
@@ -1704,6 +1712,14 @@ hacerOrdenable($("tracks"), ".track[data-name]", async filas => {
   knownTracks = ""; refresh();
 });
 
+async function alternarAleatorio() {
+  const activo = !$("q-shuffle").classList.contains("on");
+  try {
+    await post("/api/aleatorio", {activo});
+    toast(activo ? "Modo aleatorio activado para videos y música" : "Modo aleatorio desactivado: vuelve el orden de las listas");
+    refresh();
+  } catch (e) { toast(e.message, true); }
+}
 async function saltarVideo() {
   try { await post("/api/cola/saltar"); toast("Pasando al siguiente video…"); setTimeout(refresh, 1500); }
   catch (e) { toast(e.message, true); }

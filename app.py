@@ -23,7 +23,7 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 import escenas
 import lofigen
 
-VERSION = "1.7"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
+VERSION = "1.8"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
 BASE = Path(__file__).parent
 TRACKS_DIR = BASE / "data" / "tracks"
 VIDEOS_DIR = BASE / "data" / "videos"    # biblioteca de videos + cola
@@ -579,6 +579,28 @@ def api_cola():
     return jsonify(ok=True, cola=nueva)
 
 
+# Modo aleatorio: los alimentadores eligen la siguiente canción y el siguiente video al azar
+# si existe el fichero de control «aleatorio» en su carpeta (se relee antes de cada cambio).
+def aplicar_aleatorio(activo):
+    for d in (TRACKS_DIR, VIDEOS_DIR):
+        marca = d / "aleatorio"
+        if activo:
+            marca.touch()
+        else:
+            marca.unlink(missing_ok=True)
+
+
+aplicar_aleatorio(bool(load_config().get("aleatorio")))   # al arrancar, según la configuración guardada
+
+
+@app.post("/api/aleatorio")
+def api_aleatorio():
+    activo = bool(request.get_json(force=True).get("activo"))
+    actualizar_config(aleatorio=activo)
+    aplicar_aleatorio(activo)
+    return jsonify(ok=True, aleatorio=activo)
+
+
 @app.post("/api/cola/saltar")
 def api_cola_saltar():
     if not stream_running():
@@ -879,6 +901,7 @@ def api_state():
                 "inicio": stream["inicio"] if corriendo else 0,
                 "reinicios": watchdog["reinicios"], "ultimo": watchdog["ultimo"]},
         has_key=bool(cfg.get("rtmp_key")),
+        aleatorio=bool(cfg.get("aleatorio")),
         version=VERSION,
         tracks=tracks)
 
