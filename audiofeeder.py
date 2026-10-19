@@ -282,7 +282,7 @@ def tocar_infinita(cfg):
                                           "instMel": tema.get("instMel"), "bat": tema.get("bat"), "modo": tema.get("modo"),
                                           "tex": tema.get("tex"), "cambios": tema.get("cambios", []),
                                           "siguiente": estilo_sig if estilo_sig != estilo else None,
-                                          "mezcla": "+" in estilo,
+                                          "mezcla": "+" in estilo, "solo": bool(tema.get("solo_melodia")),
                                           "azar_inst": list(azar["inst"][0] or []), "azar_inst_hasta": azar["inst"][1],
                                           "azar_mel": azar["mel"][0], "azar_mel_hasta": azar["mel"][1],
                                           "melodia": ins["melodia"],

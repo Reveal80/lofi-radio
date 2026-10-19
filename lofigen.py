@@ -348,18 +348,36 @@ def render_theme(T, cycles, seed, continuo=False, fondo=1.0):
     R = RITMOS.get(T.get("bat", "boombap"), RITMOS["boombap"])
     vol_ac = (.06 if inst == "pad" else .085) * niv["acordes"]
 
+    partes = ESTRUCTURAS.get(T.get("estructura", "clasica"), ESTRUCTURAS["clasica"])
+    ritmo_arm = T.get("ritmo_armonico", "compas")
+    voicing = T.get("voicing", "cerrada")
+    solo = bool(T.get("solo_melodia"))   # radio infinita sin instrumentos: solo la melodía
+    ghost = float(T.get("ghost", 0))
     for paso in range(cycles * 16):
         t = paso * compas_dur
         c = paso % 16
-        parte = "entrada" if c < 2 else "A" if c < 10 else "B" if c < 14 else "respiro"
+        parte = partes[c]
         lista = T.get("acordesB") if (parte == "B" and T.get("acordesB")) else T["acordes"]
-        ac = lista[c % len(lista)]
+        acorde_en = lambda i: _voz(_acorde_en(lista, ritmo_arm, c, i), voicing)
+        ac = acorde_en(0)
         cuando = lambda i: t + i * corchea + (sw if i % 2 else 0)
         # acordes, según el patrón de acompañamiento de la canción
         comp = T.get("comp", "largo")
         va = vol_ac * (4 / len(ac)) ** .5   # las novenas (5 notas) no suenan más fuerte
-        acorde = lambda i, d, v: [tocar_nota(bus, inst, m, cuando(i), d, v, cinta) for m in ac]
-        if comp == "pad":
+        acorde = lambda i, d, v: [tocar_nota(bus, inst, m, cuando(i), d, v, cinta) for m in acorde_en(i)]
+        if solo:
+            pass   # sin acompañamiento
+        elif comp == "ostinato":   # dos notas del acorde alternando a corcheas
+            for i in range(8):
+                tocar_nota(bus, inst, ac[i % 2] + (12 if i % 2 else 0), cuando(i), corchea * 1.2, va * .6, cinta)
+        elif comp == "bossa":      # patrón de bossa: 1, el «y» de 2, 3 y el «y» de 4
+            for i, d in ((0, 2.2), (3, 1.4), (4, 2.2), (7, 1.4)):
+                acorde(i, corchea * d, va * .8)
+        elif comp == "balanceo":   # fundamental en el 1, acorde en el 2 y el 4
+            tocar_nota(bus, inst, ac[0], cuando(0), negra * 2, va, cinta)
+            acorde(2, corchea * 2.4, va * .7)
+            acorde(6, corchea * 2.4, va * .7)
+        elif comp == "pad":
             acorde(0, negra * 4, va * .9)
         elif comp == "stabs" and parte != "entrada":
             for i in (0, 3, 6):
@@ -380,20 +398,34 @@ def render_theme(T, cycles, seed, continuo=False, fondo=1.0):
             if inst != "pad" and parte != "entrada" and c % 2:
                 acorde(5, negra * 1.4, va * .6)
         # el bajo, según su estilo (dos octavas abajo)
-        if parte != "entrada":
-            r = ac[0] - 12   # una octava abajo: audible también en altavoces pequeños
+        if parte != "entrada" and not solo:
+            raiz = lambda i: _acorde_en(lista, ritmo_arm, c, i)[0] - 12   # una octava abajo
+            r = raiz(0)
             est = T.get("bajo", "largo")
             if est == "largo":
-                bajo_nota(resto, r, cuando(0), negra * 3.5, .075)
+                if ritmo_arm == "doble":
+                    bajo_nota(resto, r, cuando(0), negra * 1.7, .075)
+                    bajo_nota(resto, raiz(4), cuando(4), negra * 1.7, .07)
+                else:
+                    bajo_nota(resto, r, cuando(0), negra * 3.5, .075)
             elif est == "rebote":
                 bajo_nota(resto, r, cuando(0), negra * .9, .075)
                 bajo_nota(resto, r + 12, cuando(3), negra * .6, .05)
-                bajo_nota(resto, r, cuando(4), negra * 1.4, .065)
+                bajo_nota(resto, raiz(4), cuando(4), negra * 1.4, .065)
+            elif est == "octavas":   # fundamental y octava alternando
+                for i in (0, 2, 4, 6):
+                    bajo_nota(resto, raiz(i) + (12 if i in (2, 6) else 0), cuando(i), negra * .8, .06)
+            elif est == "sincopado":   # 1, el «y» de 2 y el «y» de 3
+                bajo_nota(resto, r, cuando(0), negra * 1.2, .075)
+                bajo_nota(resto, r, cuando(3), negra * .7, .055)
+                bajo_nota(resto, raiz(5), cuando(5), negra * 1.2, .065)
+            elif est == "pedal":   # la tónica mantenida pase lo que pase
+                bajo_nota(resto, T.get("raiz", r + 12) - 12, cuando(0), negra * 3.8, .07)
             else:   # caminante
                 for j, k in enumerate((0, 2, 4, 6)):
-                    bajo_nota(resto, r + (0, 3, 5, 7)[j], cuando(k), negra * .9, .065)
+                    bajo_nota(resto, raiz(k) + (0, 3, 5, 7)[j], cuando(k), negra * .9, .065)
         # la batería: ni en la entrada ni en el respiro (y a veces la B va sin bombo)
-        if parte in ("A", "B"):
+        if parte in ("A", "B") and not solo:
             sin_bombo = parte == "B" and T.get("break")
             for i in range(8):
                 if R["K"][i] == "x" and not sin_bombo:
@@ -403,9 +435,12 @@ def render_theme(T, cycles, seed, continuo=False, fondo=1.0):
                 elif R["S"][i] == "r":
                     golpe(bat, cuando(i), .08, "bandpass", 2600 * _KIT["sn"], .05)
                 if R["H"][i] == "x":
-                    golpe(bat, cuando(i), .018 if i % 2 else .028, "highpass", 7500 * _KIT["hh"], .045)
+                    if not (T.get("hats_var") and _RNG.random() < .12):   # algún charles que falta
+                        golpe(bat, cuando(i), .018 if i % 2 else .028, "highpass", 7500 * _KIT["hh"], .045)
                 elif R["H"][i] == "o":
                     golpe(bat, cuando(i), .025, "highpass", 6500 * _KIT["hh"], .22)
+                if ghost and i % 2 and R["S"][i] == "." and _RNG.random() < ghost:   # notas fantasma de caja
+                    golpe(bat, cuando(i), .035, "bandpass", 1500 * _KIT["sn"], _KIT["sd"] * .7)
                 if _KIT["shaker"]:   # maraca suave a semicorcheas
                     golpe(bat, cuando(i) + corchea / 2, .008, "highpass", 9000, .03)
                 if R.get("W", "........")[i] == "x":   # mokugyo: golpe hueco de madera
@@ -416,13 +451,18 @@ def render_theme(T, cycles, seed, continuo=False, fondo=1.0):
             tocar_nota(resto, "bonsho", T.get("raiz", 50) - 12, t, 5, .13)
         # el gancho: en A tal cual, en B una octava arriba y no siempre entero
         toca = T.get("mel_compases")   # None = en todos los compases de A/B (canciones de la biblioteca)
-        if parte in ("A", "B") and T.get("mel") and (toca is None or c in toca):
-            frase = T["mel"][(c - 2) % len(T["mel"])]
+        if solo:
+            toca = None
+        if (parte in ("A", "B") or solo) and T.get("mel") and (toca is None or c in toca):
+            k0 = (c - 2) % len(T["mel"])
+            frase = T["mel"][k0]
+            durs = T.get("mel_dur", [None] * len(T["mel"]))[k0] or [1.7] * 8
             sube = 12 if parte == "B" and T.get("subeB", True) else 0
+            vol_mel = (.09 if solo else .065) * niv["melodia"]
             for k, m in enumerate(frase):
-                if not m or (parte == "B" and _RNG.random() < .2):
+                if not m or (parte == "B" and not solo and _RNG.random() < .2):
                     continue
-                tocar_nota(melb, inst_mel, m + sube, cuando(k), corchea * 1.7, .065 * niv["melodia"], cinta)
+                tocar_nota(melb, inst_mel, m + sube, cuando(k), corchea * durs[k] * .95, vol_mel, cinta)
         if T.get("guino") and c == 15:
             guino(resto, T, t, corchea)
 
@@ -437,6 +477,8 @@ def render_theme(T, cycles, seed, continuo=False, fondo=1.0):
 
     sala = T.get("sala", (0, 1))
     mix = reverb(bus * pump + melb, *sala) + resto + bat * niv["bateria"]
+    if solo:
+        fondo = 0   # solo melodía: sin textura
     if T.get("lofi"):   # carácter de la canción: más o menos «apagada»
         mix = lowpass(mix, T["lofi"])
     if T.get("intro_filtro") and not continuo:   # la entrada suena como a través de una pared y se abre
@@ -463,7 +505,8 @@ def render_theme(T, cycles, seed, continuo=False, fondo=1.0):
 
 _QUAL = {"maj7": (0, 4, 7, 11), "m7": (0, 3, 7, 10), "7": (0, 4, 7, 10),
          "6": (0, 4, 7, 9), "maj9": (0, 4, 7, 11, 14), "m9": (0, 3, 7, 10, 14), "9": (0, 4, 7, 10, 14),
-         "5": (0, 7, 12), "sus2": (0, 2, 7), "sus4": (0, 5, 7)}   # abiertos, para el templo
+         "5": (0, 7, 12), "sus2": (0, 2, 7), "sus4": (0, 5, 7),   # abiertos, para el templo
+         "m7b5": (0, 3, 6, 10), "m6": (0, 3, 7, 9), "add9": (0, 4, 7, 14), "madd9": (0, 3, 7, 14)}
 ESCALAS = {   # pentatónicas japonesas (semitonos desde la tónica)
     "hirajoshi": (0, 2, 3, 7, 8), "insen": (0, 1, 5, 7, 10), "yo": (0, 2, 5, 7, 9),
     "blues": (0, 3, 5, 6, 7, 10),
@@ -474,6 +517,14 @@ _PROGS_MENOR = [   # en menor natural (semitonos desde la tónica)
     [(0, "m7"), (7, "m7"), (8, "maj7"), (5, "m7")],         # i-v-VI-iv
     [(5, "m7"), (10, "7"), (3, "maj7"), (8, "maj7")],       # iv-VII-III-VI
     [(0, "m7"), (0, "m7"), (8, "maj7"), (7, "7")],          # i-i-VI-V
+    # más variedad (2026-10-19, «la música siempre parece la misma»)
+    [(0, "m9"), (10, "7"), (8, "maj7"), (10, "7")],         # i-VII-VI-VII
+    [(0, "m7"), (5, "m7"), (7, "m7"), (0, "m7")],           # i-iv-v-i
+    [(0, "madd9"), (3, "maj7"), (10, "7"), (8, "maj7")],    # i-III-VII-VI
+    [(2, "m7b5"), (7, "7"), (0, "m7"), (0, "m7")],          # ii°-V-i (cadencia menor)
+    [(0, "m7"), (8, "maj7")],                               # vamp i-VI
+    [(0, "m6"), (5, "m7")],                                 # vamp i6-iv
+    [(0, "m7"), (10, "7"), (3, "maj7"), (8, "maj7"), (5, "m7"), (7, "7"), (0, "m7"), (0, "m7")],   # vuelta larga
 ]
 _NOVENA = {"maj7": "maj9", "m7": "m9", "7": "9"}
 _PROGS = [   # progresiones típicas del género, en grados de la escala mayor
@@ -482,7 +533,44 @@ _PROGS = [   # progresiones típicas del género, en grados de la escala mayor
     [(5, "maj7"), (4, "m7"), (2, "m7"), (0, "maj7")],       # IV-iii-ii-I
     [(0, "maj7"), (5, "maj7"), (0, "maj7"), (5, "maj7")],   # I-IV con maj7
     [(0, "maj7"), (9, "m7"), (5, "maj7"), (7, "7")],        # I-vi-IV-V
+    # más variedad (2026-10-19)
+    [(0, "maj7"), (7, "7"), (9, "m7"), (5, "maj7")],        # I-V-vi-IV
+    [(9, "m7"), (5, "maj7"), (0, "maj7"), (7, "7")],        # vi-IV-I-V
+    [(0, "add9"), (4, "m7"), (5, "maj7"), (5, "m6")],       # I-iii-IV-iv (prestado)
+    [(0, "maj7"), (10, "7"), (5, "maj7"), (0, "maj7")],     # I-bVII-IV-I (mixolidio)
+    [(0, "maj7"), (9, "m7"), (2, "m7"), (7, "7")],          # I-vi-ii-V
+    [(5, "maj7"), (7, "7"), (4, "m7"), (9, "m7")],          # IV-V-iii-vi
+    [(0, "maj7"), (5, "maj7")],                             # vamp I-IV
+    [(2, "m7"), (7, "7")],                                  # vamp ii-V
+    [(0, "maj7"), (4, "m7"), (5, "maj7"), (7, "7"), (9, "m7"), (2, "m7"), (5, "maj7"), (7, "7")],   # vuelta larga
 ]
+RITMOS_ARMONICOS = ["compas", "compas", "compas", "medio", "doble"]   # acordes por compás: 1, 1 cada 2, 2
+ESTRUCTURAS = {   # (parte de cada uno de los 16 compases)
+    "clasica": ["entrada"] * 2 + ["A"] * 8 + ["B"] * 4 + ["respiro"] * 2,
+    "AB":      ["entrada"] * 2 + ["A"] * 6 + ["B"] * 6 + ["respiro"] * 2,
+    "larga":   ["entrada"] * 2 + ["A"] * 12 + ["respiro"] * 2,
+    "directa": ["A"] * 10 + ["B"] * 4 + ["respiro"] * 2,
+    "puente":  ["entrada"] * 2 + ["A"] * 4 + ["B"] * 4 + ["A"] * 4 + ["respiro"] * 2,
+}
+
+
+def _voz(ac, voicing):
+    """Disposición del acorde: cerrada (tal cual), abierta (la 2ª nota una octava abajo) o inversión."""
+    if voicing == "abierta" and len(ac) >= 3:
+        return [ac[0], ac[1] - 12, *ac[2:]]
+    if voicing == "inversion" and len(ac) >= 3:
+        return [*ac[1:], ac[0] + 12]
+    return list(ac)
+
+
+def _acorde_en(lista, ritmo, c, i):
+    """Acorde que suena en el compás c, corchea i, según el ritmo armónico."""
+    n = len(lista)
+    if ritmo == "medio":
+        return lista[(c // 2) % n]
+    if ritmo == "doble":
+        return lista[(2 * c + (1 if i >= 4 else 0)) % n]
+    return lista[c % n]
 
 
 def _acordes_de(prog, tonica):
@@ -504,30 +592,97 @@ _PATRONES_MEL = {
 }
 
 
-def _mel_aleatoria(rng, tonica, acordes, menor=False, densidad="normal", grados=None):
-    """Gancho: 4 frases de 8 corcheas; la densidad marca cuántas notas lleva."""
+_FORMAS_MEL = [   # forma de las 4 frases: A = motivo, A' = variación, B/C = otros motivos, - = silencio/nota larga
+    ["A", "A'", "B", "A"], ["A", "B", "A", "C"], ["A", "-", "A'", "B"], ["A", "A", "B", "B'"],
+    ["A", "A'", "A''", "B"], ["A", "B", "-", "A'"],
+]
+
+
+def _mel_aleatoria(rng, tonica, acordes, menor=False, densidad="normal", grados=None, registro=None):
+    """Gancho de 4 compases por motivos (2026-10-19, antes era un paseo por la escala que sonaba
+    siempre igual): un motivo con su ritmo (con síncopas y duraciones distintas) y su contorno
+    (pasos, saltos de tercera/cuarta y vuelta atrás tras el salto), repetido, variado o
+    contestado según una forma (A A' B A, A B A C…); los tiempos fuertes caen en notas del
+    acorde y la última frase cierra larga en una nota del acorde. Devuelve (frases, duraciones)."""
     grados = grados or ((0, 2, 3, 5, 7, 8, 10) if menor else (0, 2, 4, 5, 7, 9, 11))
     esc = sorted({tonica + o + d for o in (12, 24) for d in grados})
-    idx = min(range(len(esc)), key=lambda i: abs(esc[i] - (tonica + 19)))
-    pats = _PATRONES_MEL.get(densidad, _PATRONES_MEL["normal"])
-    frases = []
-    for bar in range(4):
-        frase = [0] * 8
-        for o in pats[rng.integers(len(pats))]:
-            idx = int(np.clip(idx + rng.choice([-2, -1, -1, 1, 1, 2]),
-                              0, len(esc) - 1))
-            nota = esc[idx]
-            if o in (0, 4):   # tiempos fuertes sobre notas del acorde
-                pcs = {p % 12 for p in acordes[bar]}
-                cand = [x for x in esc if x % 12 in pcs] or [nota]
-                nota = min(cand, key=lambda x: abs(x - nota))
-                idx = esc.index(nota)
-            frase[o] = nota
-        frases.append(frase)
-    fin = min((x for x in esc if x % 12 == tonica % 12),
-              key=lambda x: abs(x - esc[idx]))
-    frases[3] = [fin] + [0] * 7   # la última frase cierra en la tónica
-    return frases
+    registro = registro if registro is not None else int(rng.choice([14, 19, 19, 24]))
+    centro = min(range(len(esc)), key=lambda i: abs(esc[i] - (tonica + registro)))
+    lo, hi = {"escasa": (1, 3), "normal": (3, 5), "densa": (5, 7)}.get(densidad, (3, 5))
+
+    def ritmo():
+        n = int(rng.integers(lo, hi + 1))
+        pos = set(int(x) for x in rng.choice(8, size=n, replace=False))
+        if rng.random() < .75:
+            pos.add(0)
+        pos = sorted(pos)
+        durs = [min(4, (pos[j + 1] - pos[j]) if j + 1 < len(pos) else 8 - pos[j]) for j in range(len(pos))]
+        durs = [d if rng.random() < .7 else max(1, d - 1) for d in durs]   # algunas más cortas (staccato)
+        return pos, durs
+
+    def contorno(n):
+        pasos, d, ultimo = [], int(rng.choice([-1, 1])), 0
+        for _ in range(n - 1):
+            if abs(ultimo) >= 3:                          # tras un salto, vuelta por grados conjuntos
+                p = -int(np.sign(ultimo)) * int(rng.integers(1, 3))
+            else:
+                if rng.random() < .3:
+                    d = -d
+                p = d * int(rng.choice([1, 1, 1, 2, 2, 3, 4]))
+                if rng.random() < .12:
+                    p = 0                                 # nota repetida
+            pasos.append(p); ultimo = p
+        return pasos
+
+    def motivo():
+        pos, durs = ritmo()
+        return {"pos": pos, "durs": durs, "pasos": contorno(len(pos)), "ini": int(rng.integers(-2, 3))}
+
+    def variar(m):
+        v = {k: (list(x) if isinstance(x, list) else x) for k, x in m.items()}
+        modo = rng.choice(["secuencia", "ornamento", "ritmo"])
+        if modo == "secuencia":                          # mismo dibujo un grado más arriba o abajo
+            v["ini"] += int(rng.choice([-2, -1, 1, 2]))
+        elif modo == "ornamento" and v["pasos"]:         # un paso cambia
+            j = int(rng.integers(len(v["pasos"]))); v["pasos"][j] += int(rng.choice([-1, 1]))
+        else:                                            # una nota más o menos
+            if len(v["pos"]) > 1 and rng.random() < .5:
+                j = int(rng.integers(len(v["pos"]))); v["pos"].pop(j); v["durs"].pop(j); v["pasos"] = v["pasos"][:len(v["pos"]) - 1]
+            else:
+                libres = [x for x in range(8) if x not in v["pos"]]
+                if libres:
+                    x = int(rng.choice(libres)); v["pos"].append(x); v["pos"].sort(); v["durs"].append(1); v["pasos"].append(int(rng.choice([-1, 1])))
+        return v
+
+    motivos = {"A": motivo(), "B": motivo(), "C": motivo()}
+    forma = _FORMAS_MEL[int(rng.integers(len(_FORMAS_MEL)))]
+    frases, duraciones = [], []
+    for bar, etiqueta in enumerate(forma):
+        frase, dur = [0] * 8, [1] * 8
+        pcs = {p % 12 for p in acordes[bar % len(acordes)]}
+        chord_idx = [i for i, x in enumerate(esc) if x % 12 in pcs] or list(range(len(esc)))
+        if etiqueta == "-":                              # respiro: silencio o una nota larga del acorde
+            if rng.random() < .5:
+                i = min(chord_idx, key=lambda i: abs(i - centro)); frase[0], dur[0] = esc[i], 6
+            frases.append(frase); duraciones.append(dur); continue
+        base = etiqueta[0]
+        m = motivos[base]
+        for _ in range(etiqueta.count("'")):
+            m = variar(m)
+        idx = int(np.clip(centro + m["ini"], 0, len(esc) - 1))
+        for j, o in enumerate(m["pos"]):
+            if j:
+                idx = int(np.clip(idx + m["pasos"][j - 1], 0, len(esc) - 1))
+            if o in (0, 4) or bar == len(forma) - 1 and j == len(m["pos"]) - 1:   # fuertes y final: nota del acorde
+                idx = min(chord_idx, key=lambda i: abs(i - idx))
+            frase[o], dur[o] = esc[idx], m["durs"][j]
+        frases.append(frase); duraciones.append(dur)
+    # la última nota, larga
+    ult = frases[-1]
+    k = max((i for i in range(8) if ult[i]), default=None)
+    if k is not None:
+        duraciones[-1][k] = max(duraciones[-1][k], 8 - k)
+    return frases, duraciones
 
 
 # ── estilos: acotan las elecciones del compositor (cada canción sigue siendo distinta) ──
@@ -636,8 +791,12 @@ def instrumentos_de(estilos):
 
 def con_instrumentos(E, quitar=(), anadir=(), todos=False):
     """Copia del estilo con los instrumentos que el usuario quita o añade (acordes y melodía).
-    todos=True (botón «Aleatorio»): cualquiera de INST_NOMBRES, sin atender al estilo."""
+    todos=True (botón «Aleatorio»): cualquiera de INST_NOMBRES, sin atender al estilo.
+    Si quita todos: «solo melodía» (sin acordes, bajo ni batería; la melodía sigue con su timbre)."""
     E = dict(E)
+    if not anadir and all(k in quitar for k in INST_NOMBRES):
+        E["solo_melodia"] = True
+        return E
     for k in ("inst", "instMel"):
         base = list(INST_NOMBRES) if todos else E.get(k, TODOS[k])
         lista = [x for x in base if x not in quitar] + [x for x in anadir if x not in base and x in INST_NOMBRES]
@@ -725,7 +884,20 @@ def tema_aleatorio(seed, estilo="aleatorio", E=None):
         while tn < 60:
             tn += 12
         tema["tonica"] = tn
-    tema["mel"] = _mel_aleatoria(rng, tonica, acordes, menor, elige("densidad"), ESCALAS.get(escala))
+    tema["ritmo_armonico"] = str(rng.choice(E.get("ritmo_armonico", RITMOS_ARMONICOS)))
+    tema["voicing"] = str(rng.choice(["cerrada", "cerrada", "abierta", "inversion"]))
+    tema["estructura"] = str(rng.choice(list(ESTRUCTURAS)))
+    tema["registro"] = int(rng.choice([14, 19, 19, 24]))
+    tema["ghost"] = float(rng.choice([0, 0, .15, .3]))
+    tema["hats_var"] = bool(rng.random() < .5)
+    if rng.random() < .2:   # vuelta larga: dos progresiones seguidas
+        otra = con9(progs[rng.integers(len(progs))])
+        acordes = acordes + _acordes_de(otra, tonica)
+        tema["acordes"] = acordes
+    # acordes por compás tal como sonarán (ritmo armónico), para que la melodía caiga en ellos
+    por_compas = [_acorde_en(acordes, tema["ritmo_armonico"], c, 0) for c in range(4)]
+    tema["mel"], tema["mel_dur"] = _mel_aleatoria(rng, tonica, por_compas, menor, elige("densidad"),
+                                                  ESCALAS.get(escala), tema["registro"])
     tema["raiz"] = tonica   # para poder componer otra melodía sobre los mismos acordes (radio infinita)
     return tema
 
@@ -733,7 +905,9 @@ def tema_aleatorio(seed, estilo="aleatorio", E=None):
 # ── radio infinita: tramos encadenados que cambian poco a poco ──
 
 _GRUPOS = {   # parámetros que viajan juntos al pasar de un tramo al siguiente
-    "armonia": ("modo", "acordes", "acordesB", "mel", "guino", "tonica", "raiz", "escala", "bonsho"),
+    "armonia": ("modo", "acordes", "acordesB", "mel", "mel_dur", "guino", "tonica", "raiz", "escala", "bonsho",
+                "ritmo_armonico", "voicing", "registro"),
+    "forma": ("estructura", "ghost", "hats_var"),
     "inst": ("inst",), "instMel": ("instMel",), "bat": ("bat", "kit", "break"), "bajo": ("bajo", "bajoTimbre"),
     "comp": ("comp",), "tex": ("tex", "texVol"), "sala": ("sala",), "lofi": ("lofi",), "niveles": ("niveles",),
 }
@@ -786,13 +960,16 @@ def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None, quitar=(), anadir=(
         T["sin_armonia"] = 0 if "armonia" in cambios else sin_armonia
         if "armonia" not in cambios and not minimo and rng.random() < .7:   # otra melodía sobre los mismos acordes
             dens = str(rng.choice(E.get("densidad", TODOS["densidad"])))
-            T["mel"] = _mel_aleatoria(rng, T["raiz"], T["acordes"], T["modo"] == "menor", dens, ESCALAS.get(T.get("escala")))
+            por_compas = [_acorde_en(T["acordes"], T.get("ritmo_armonico", "compas"), c, 0) for c in range(4)]
+            T["mel"], T["mel_dur"] = _mel_aleatoria(rng, T["raiz"], por_compas, T["modo"] == "menor", dens,
+                                                    ESCALAS.get(T.get("escala")), T.get("registro"))
         if T["inst"] == "pad" and T["comp"] in ("stabs", "charleston", "roto"):
             T["comp"] = "pad"
         if "bat" in cambios or "armonia" in cambios:
             T["sw"] = nuevo["sw"]
         T["bpm"] = prev["bpm"]
     T.pop("guino", None)   # sin guiños de 8 bits en la radio infinita (al usuario le sonaban a videojuego)
+    T["solo_melodia"] = bool(E.get("solo_melodia"))   # todos los instrumentos quitados: solo la melodía, continua
     # cuánta melodía: en qué compases de A/B (2..13) suena el gancho, en frases de dos compases.
     # Por defecto «de vez en cuando»: el usuario se quejaba de que el gancho sonaba siempre y parecía el mismo
     lo, hi = MELODIA.get(int(melodia), MELODIA[1])

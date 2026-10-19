@@ -453,7 +453,7 @@
   .vinfo-line { margin: 0 16px 10px; }
   .vinfo-line span:first-child { white-space: normal; }
   .vinfo-line b { color: var(--ink); font-weight: 600; }
-  .vgridcols, .vitem { display: grid; grid-template-columns: 14px 40px 72px minmax(0,1fr) 104px 150px 52px 40px; gap: 12px; align-items: center; padding: 0 12px; }
+  .vgridcols, .vitem { display: grid; grid-template-columns: 14px 40px 72px minmax(0,1fr) 122px 150px 52px 40px; gap: 14px; align-items: center; padding: 0 12px; }
   .vflags { display: flex; align-items: center; gap: 8px; }
   .vflags .switch.niebla { width: 34px; height: 20px; } .vflags .switch.niebla span::after { width: 14px; height: 14px; }
   .vflags .switch.niebla input:checked + span { background: linear-gradient(135deg, #7fb6ff, #c9d8ff); }
@@ -793,7 +793,7 @@
           <div class="ih"><b>Radio infinita</b><span>la música se compone sola mientras suena. Marca uno o varios estilos (con varios, va rotando) y el tempo; los cambios entran en el siguiente compás</span><small id="inf-now"></small></div>
           <div class="escenas" id="inf-estilos"></div>
           <div class="inf-rota" id="inf-rota" hidden><span>Con varios estilos:</span><button class="chip" data-min="0" title="Un solo estilo que suma los marcados: instrumentos, ritmos y tempos de todos ellos">Mezclar</button><span style="color:var(--dim)">o cambiar cada</span><button class="chip" data-min="15">15 min</button><button class="chip" data-min="30">30 min</button><button class="chip" data-min="60">1 h</button><button class="chip" data-min="120">2 h</button><button class="chip" data-min="240">4 h</button><small id="inf-rota-txt"></small></div>
-          <div class="inf-inst"><span title="Los del estilo van marcados; pulsa uno para quitarlo o para añadir otro. Entra en el siguiente tramo">Instrumentos</span><div class="chips" id="inf-inst-chips"><button class="chip rnd" id="inf-inst-rnd" onclick="alternarAzar('inst_aleatorio')" aria-label="aleatorio" title="Sortea una combinación de 2 a 4 instrumentos (sin los que hayas quitado) y cambiará cada 30 minutos"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button></div></div>
+          <div class="inf-inst"><span title="Los del estilo van marcados; pulsa uno para quitarlo o para añadir otro. Entra en el siguiente tramo">Instrumentos</span><div class="chips" id="inf-inst-chips"><small id="inf-inst-nota" style="width:100%;order:100;font:11px var(--mono);color:var(--ok)"></small><button class="chip rnd" id="inf-inst-rnd" onclick="alternarAzar('inst_aleatorio')" aria-label="aleatorio" title="Sortea una combinación de 2 a 4 instrumentos (sin los que hayas quitado) y cambiará cada 30 minutos"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button></div></div>
           <div class="inf-rota" id="inf-mel"><span title="Cuántos compases llevan melodía; el resto son acordes y bajo">Melodía</span><button class="chip" data-mel="0">ninguna</button><button class="chip" data-mel="1">de vez en cuando</button><button class="chip" data-mel="2">normal</button><button class="chip" data-mel="3">continua</button><button class="chip rnd" id="inf-mel-rnd" onclick="alternarAzar('melodia_aleatoria')" aria-label="aleatorio" title="Sortea un nivel de melodía y cambiará cada 30 minutos"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button></div>
           <div class="inf-tempo">
             <span>Tempo</span><span class="lim">50</span>
@@ -1831,7 +1831,8 @@ function tickCola() {
   if (mu.infinita) {
     const i = mu.infinita, pas = Date.now() / 1000 - mu.inicio, dur = mu.dur || 0;
     $("m-live-t").textContent = `Radio infinita · ${i.estilo_nombre} · ${i.bpm} bpm`;
-    $("m-live-r").textContent = `tramo ${i.n} · ${fmt(Math.min(pas, dur))} / ${fmt(dur)} · ${i.inst} + ${i.instMel} · batería ${i.bat} · ${i.modo}`;
+    $("m-live-r").textContent = i.solo ? `tramo ${i.n} · ${fmt(Math.min(pas, dur))} / ${fmt(dur)} · solo melodía (${i.instMel}), sin acordes, bajo ni batería`
+                                       : `tramo ${i.n} · ${fmt(Math.min(pas, dur))} / ${fmt(dur)} · ${i.inst} + ${i.instMel} · batería ${i.bat} · ${i.modo}`;
     $("m-live-bar").style.width = dur ? Math.min(100, pas / dur * 100) + "%" : "0";
     $("inf-now").textContent = (i.cambios?.length ? "cambió: " + i.cambios.join(", ") : "");
   } else if (mu.name) {
@@ -2057,6 +2058,8 @@ function pintarInfinita(d, estilos) {
   const quitar = new Set(d.inst_quitar || []), anadir = new Set(d.inst_anadir || []);
   const base = new Set(d.inst_aleatorio ? (i?.azar_inst?.length ? i.azar_inst : Object.keys(d.instrumentos || {})) : (d.inst_estilo || []));
   const suena = new Set([i?.inst, i?.instMel].filter(Boolean));
+  const ninguno = ![...base, ...anadir].some(k => !quitar.has(k));
+  $("inf-inst-nota").textContent = ninguno ? "ninguno: solo la melodía, continua y sin acordes, bajo ni batería" : "";
   chips.querySelectorAll(".chip[data-inst]").forEach(c => {
     const k = c.dataset.inst, on = (base.has(k) || anadir.has(k)) && !quitar.has(k);
     c.classList.toggle("on", on); c.classList.toggle("extra", on && anadir.has(k) && !base.has(k)); c.classList.toggle("suena", suena.has(k));
