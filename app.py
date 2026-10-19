@@ -24,7 +24,7 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 import escenas
 import lofigen
 
-VERSION = "2.5"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
+VERSION = "2.6"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
 BASE = Path(__file__).parent
 TRACKS_DIR = BASE / "data" / "tracks"
 VIDEOS_DIR = BASE / "data" / "videos"    # biblioteca de videos + cola
