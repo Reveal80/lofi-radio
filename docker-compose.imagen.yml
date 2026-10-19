@@ -17,6 +17,12 @@ services:
     volumes:
       - ./data:/app/data   # música, videos y config.json (clave de YouTube)
       - ./logs:/app/logs   # registros de la emisión
+    # GPU integrada (opcional): quita el «#» de las tres líneas siguientes para ceder la gráfica del
+    # servidor al contenedor (Intel/AMD por VAAPI). Solo si existe /dev/dri/renderD128 en el servidor;
+    # si no, el contenedor no arrancaría.
+    # devices:
+    #   - /dev/dri:/dev/dri
+    # group_add: ["video", "render"]
     depends_on:
       - mediamtx
     expose:

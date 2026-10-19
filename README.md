@@ -55,6 +55,12 @@ services:
     volumes:
       - ./data:/app/data   # música, videos y config.json (clave de YouTube)
       - ./logs:/app/logs   # registros de la emisión
+    # GPU integrada (opcional): quita el «#» de las tres líneas siguientes para ceder la gráfica del
+    # servidor al contenedor (Intel/AMD por VAAPI). Solo si existe /dev/dri/renderD128 en el servidor;
+    # si no, el contenedor no arrancaría.
+    # devices:
+    #   - /dev/dri:/dev/dri
+    # group_add: ["video", "render"]
     depends_on:
       - mediamtx
     expose:
@@ -140,6 +146,9 @@ ponle delante un proxy con autenticación o una VPN.
 ## Requisitos
 
 - Unos 1,5 núcleos de CPU mientras emite (codificación h264 a 1080p y 30 fps por software).
+- GPU integrada: el `docker-compose.yml` trae un bloque opcional (`devices` / `group_add`, comentado) para
+  ceder la gráfica al contenedor. De momento la emisión codifica siempre por CPU; la codificación por
+  hardware (VAAPI) llegará en una versión posterior.
 - Alrededor de 1 GB de RAM.
 - Subida a Internet de unos 9 Mbit/s para YouTube a 1080p (la emisión va a 6800 kbps, lo que
   recomienda YouTube; se puede bajar con `"video_kbps": 4500` en `data/config.json`).
