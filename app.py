@@ -9,6 +9,7 @@ import os
 import random
 import re
 import secrets
+import shutil
 import signal as sig
 import subprocess
 import threading
@@ -23,7 +24,7 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 import escenas
 import lofigen
 
-VERSION = "2.1"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
+VERSION = "2.2"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
 BASE = Path(__file__).parent
 TRACKS_DIR = BASE / "data" / "tracks"
 VIDEOS_DIR = BASE / "data" / "videos"    # biblioteca de videos + cola
@@ -895,6 +896,226 @@ def api_logs():
     ocultar = lambda t: t.replace(key, "<clave>") if key else t   # ffmpeg imprime la URL con la clave
     return jsonify(stream=ocultar(_cola_de_archivo(STREAM_LOG)), vigilante=_cola_de_archivo(WATCHDOG_LOG),
                    anterior=ocultar(_cola_de_archivo(STREAM_LOG_ANTERIOR)))
+
+
+# ---------------- estadísticas de recursos (botón «Stats» del panel) ----------------
+# Todo se lee de /proc y del cgroup del propio contenedor: no hace falta el socket de Docker.
+# Los porcentajes se calculan por diferencia con la lectura anterior (el panel pide cada 2 s).
+CGROUP = Path("/sys/fs/cgroup")
+_stats_lock = threading.Lock()
+_stats_prev = {}
+_CLK_TCK = os.sysconf("SC_CLK_TCK")
+
+
+def _leer(path, defecto=""):
+    try:
+        return Path(path).read_text().strip()
+    except OSError:
+        return defecto
+
+
+def _cgroup_kv(nombre):
+    out = {}
+    for linea in _leer(CGROUP / nombre).splitlines():
+        partes = linea.split()
+        if len(partes) == 2 and partes[1].isdigit():
+            out[partes[0]] = int(partes[1])
+    return out
+
+
+def _cpu_host():
+    """Ticks totales y ocupados de todas las CPU del servidor (/proc/stat)."""
+    for linea in _leer("/proc/stat").splitlines():
+        if linea.startswith("cpu "):
+            v = [int(x) for x in linea.split()[1:]]
+            total = sum(v)
+            return total, total - v[3] - v[4]   # sin idle ni iowait
+    return 0, 0
+
+
+def _mem_host():
+    m = {}
+    for linea in _leer("/proc/meminfo").splitlines():
+        k, _, resto = linea.partition(":")
+        try:
+            m[k] = int(resto.split()[0]) * 1024
+        except (ValueError, IndexError):
+            pass
+    return m
+
+
+def _procesos():
+    """Procesos del contenedor: pid, nombre, ticks de CPU y RSS (de /proc/<pid>/stat)."""
+    pagina = os.sysconf("SC_PAGE_SIZE")
+    out = {}
+    for d in os.scandir("/proc"):
+        if not d.name.isdigit():
+            continue
+        try:
+            st = Path(d.path, "stat").read_text()
+            cmd = Path(d.path, "cmdline").read_bytes().split(b"\0")
+        except OSError:
+            continue
+        nombre = st[st.index("(") + 1:st.rindex(")")]
+        campos = st[st.rindex(")") + 2:].split()
+        ticks = int(campos[11]) + int(campos[12])
+        rss = int(campos[21]) * pagina
+        args = [a.decode(errors="replace") for a in cmd if a]
+        if nombre in ("python", "python3", "bash", "sh") and len(args) > 1:
+            nombre = f"{nombre} {Path(args[1]).name}"   # app.py / videofeeder.py / audiofeeder.py
+        out[int(d.name)] = {"nombre": nombre, "ticks": ticks, "rss": rss}
+    return out
+
+
+def _tam_carpeta(d, ext=None):
+    total = n = 0
+    try:
+        for f in os.scandir(d):
+            if f.is_file() and (ext is None or f.name.endswith(ext)):
+                total += f.stat().st_size
+                n += 1
+    except OSError:
+        pass
+    return total, n
+
+
+def _gpu():
+    """Gráficas visibles en /sys/class/drm; renderD* es lo que necesita ffmpeg para codificar por hardware."""
+    vendedores = {"0x8086": "Intel", "0x1002": "AMD", "0x10de": "NVIDIA", "0x1414": "Microsoft (virtual)",
+                  "0x1af4": "virtio (virtual)", "0x15ad": "VMware (virtual)"}
+    tarjetas = []
+    for card in sorted(Path("/sys/class/drm").glob("card[0-9]*")):
+        if "-" in card.name:
+            continue
+        dev = card / "device"
+        vendor = _leer(dev / "vendor")
+        info = {"nombre": card.name, "vendedor": vendedores.get(vendor, vendor or "desconocido"),
+                "driver": Path(os.path.realpath(dev / "driver")).name if (dev / "driver").exists() else "",
+                "render": sorted(r.name for r in (dev / "drm").glob("renderD*")),
+                "mhz": None, "mhz_max": None}
+        try:
+            cur, mx = _leer(card / "gt_cur_freq_mhz"), _leer(card / "gt_max_freq_mhz")
+            if cur and mx:
+                info["mhz"], info["mhz_max"] = int(cur), int(mx)
+        except ValueError:
+            pass
+        tarjetas.append(info)
+    render = sorted(p.name for p in Path("/dev/dri").glob("renderD*")) if Path("/dev/dri").exists() else []
+    return {"tarjetas": tarjetas, "render": render, "codificador": "CPU (libx264)"}
+
+
+_RE_FFMPEG = re.compile(r"frame=\s*(\d+)\s+fps=\s*([\d.]+)\s+q=\s*([-\d.]+).*?time=(\S+).*?speed=\s*([\d.]+)x")
+
+
+def _ffmpeg_progreso():
+    """Última línea de progreso de ffmpeg en stream.log (-stats_period 5)."""
+    cola = _cola_de_archivo(STREAM_LOG, n=20, maximo=6_000)
+    m = None
+    for m in _RE_FFMPEG.finditer(cola):
+        pass
+    if not m:
+        return None
+    return {"frame": int(m.group(1)), "fps": float(m.group(2)), "q": float(m.group(3)),
+            "tiempo": m.group(4), "velocidad": float(m.group(5))}
+
+
+@app.get("/api/stats")
+def api_stats():
+    with _stats_lock:
+        ahora = time.monotonic()
+        prev = _stats_prev
+        if prev and ahora - prev["t"] < 0.5 and "res" in prev:
+            return jsonify(prev["res"])
+        ncpu = os.cpu_count() or 1
+        cpu_max = _leer(CGROUP / "cpu.max").split()
+        limite_cpu = (int(cpu_max[0]) / int(cpu_max[1])) if len(cpu_max) == 2 and cpu_max[0] != "max" else ncpu
+        uso_cont = _cgroup_kv("cpu.stat").get("usage_usec", 0)
+        host_total, host_ocupado = _cpu_host()
+        procs = _procesos()
+        net = {}
+        for linea in _leer("/proc/net/dev").splitlines():
+            if ":" in linea:
+                iface, datos = linea.split(":", 1)
+                v = datos.split()
+                if iface.strip() != "lo":
+                    net[iface.strip()] = (int(v[0]), int(v[8]))   # bytes recibidos, enviados
+        rx = sum(a for a, _ in net.values())
+        tx = sum(b for _, b in net.values())
+        io = {}
+        for linea in _leer(CGROUP / "io.stat").splitlines():
+            for kv in linea.split()[1:]:
+                k, _, v = kv.partition("=")
+                if v.isdigit():
+                    io[k] = io.get(k, 0) + int(v)
+
+        dt = (ahora - prev["t"]) if prev else 0
+        cpu_cont_pct = cpu_host_pct = rx_kbps = tx_kbps = rd_bps = wr_bps = 0.0
+        proc_pct = {}
+        if dt > 0:
+            cpu_cont_pct = (uso_cont - prev["uso_cont"]) / (dt * 1e6) * 100       # % de un núcleo
+            d_total = host_total - prev["host_total"]
+            if d_total > 0:
+                cpu_host_pct = (host_ocupado - prev["host_ocupado"]) / d_total * 100
+            rx_kbps = (rx - prev["rx"]) * 8 / dt / 1000
+            tx_kbps = (tx - prev["tx"]) * 8 / dt / 1000
+            rd_bps = (io.get("rbytes", 0) - prev["io"].get("rbytes", 0)) / dt
+            wr_bps = (io.get("wbytes", 0) - prev["io"].get("wbytes", 0)) / dt
+            for pid, pr in procs.items():
+                antes = prev["procs"].get(pid)
+                if antes:
+                    proc_pct[pid] = (pr["ticks"] - antes["ticks"]) / _CLK_TCK / dt * 100
+        _stats_prev.clear()
+        _stats_prev.update(t=ahora, uso_cont=uso_cont, host_total=host_total, host_ocupado=host_ocupado,
+                           rx=rx, tx=tx, io=io, procs=procs)
+
+        mem = _mem_host()
+        mem_cont = int(_leer(CGROUP / "memory.current", "0") or 0)
+        mem_stat = _cgroup_kv("memory.stat")
+        mem_max = _leer(CGROUP / "memory.max", "max")
+        mem_limite = int(mem_max) if mem_max.isdigit() else mem.get("MemTotal", 0)
+        try:
+            uptime_host = float(_leer("/proc/uptime").split()[0])
+            inicio_pid1 = int(Path("/proc/1/stat").read_text().rsplit(")", 1)[1].split()[19]) / _CLK_TCK
+            uptime_cont = uptime_host - inicio_pid1
+        except (OSError, ValueError, IndexError):
+            uptime_host = uptime_cont = 0
+        try:
+            carga = [float(x) for x in _leer("/proc/loadavg").split()[:3]]
+        except ValueError:
+            carga = [0, 0, 0]
+        disco = shutil.disk_usage(TRACKS_DIR)
+        musica, n_musica = _tam_carpeta(TRACKS_DIR, ".mp3")
+        videos, n_videos = _tam_carpeta(VIDEOS_DIR, ".mp4")
+        logs, _ = _tam_carpeta(LOGS_DIR)
+        top = sorted(procs.items(), key=lambda kv: (proc_pct.get(kv[0], 0), kv[1]["rss"]), reverse=True)[:8]
+        corriendo = stream_running()
+        res = {
+            "contenedor": {
+                "cpu_pct": round(cpu_cont_pct, 1), "cpu_limite": round(limite_cpu, 2), "ncpu": ncpu,
+                "mem": mem_cont, "mem_rss": mem_stat.get("anon", mem_cont), "mem_cache": mem_stat.get("file", 0),
+                "mem_limite": mem_limite, "procesos": len(procs), "uptime": round(uptime_cont),
+                "pids_max": _leer(CGROUP / "pids.max", "max"),
+            },
+            "servidor": {
+                "cpu_pct": round(cpu_host_pct, 1), "ncpu": ncpu, "carga": carga,
+                "mem_total": mem.get("MemTotal", 0), "mem_disponible": mem.get("MemAvailable", 0),
+                "swap_total": mem.get("SwapTotal", 0), "swap_libre": mem.get("SwapFree", 0),
+                "uptime": round(uptime_host),
+            },
+            "red": {"rx_kbps": round(rx_kbps), "tx_kbps": round(tx_kbps), "rx_total": rx, "tx_total": tx},
+            "disco": {"total": disco.total, "usado": disco.used, "libre": disco.free,
+                      "musica": musica, "n_musica": n_musica, "videos": videos, "n_videos": n_videos, "logs": logs,
+                      "lectura_bps": round(rd_bps), "escritura_bps": round(wr_bps)},
+            "gpu": _gpu(),
+            "emision": {"running": corriendo, "mode": stream["mode"] if corriendo else "",
+                        "kbps": int(load_config().get("video_kbps") or 6800),
+                        "ffmpeg": _ffmpeg_progreso() if corriendo else None},
+            "procesos": [{"pid": pid, "nombre": pr["nombre"], "cpu_pct": round(proc_pct.get(pid, 0), 1), "rss": pr["rss"]}
+                         for pid, pr in top],
+            "version": VERSION,
+        }
+        _stats_prev["res"] = res
+        return jsonify(res)
 
 
 @app.get("/api/state")

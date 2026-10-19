@@ -528,6 +528,30 @@
   .drawer .terminal { flex: 1; }
   .drawer .terminal pre { font-size: 11.5px; }
 
+  /* ---------- panel de stats ---------- */
+  .sx-body { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 14px; padding-right: 4px; }
+  .sx-sec h3 { margin: 0 0 8px; font: 500 10.5px var(--mono); color: var(--dim); letter-spacing: .14em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+  .sx-sec h3 small { font: 11px var(--sans); color: var(--muted); letter-spacing: 0; text-transform: none; margin-left: auto; }
+  .sx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 10px; }
+  .sx { padding: 12px 14px; border-radius: 14px; background: var(--glass); border: 1px solid var(--stroke); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .sx .k { font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .sx .k svg { width: 13px; height: 13px; flex: none; }
+  .sx .v { font: 700 22px/1.1 var(--sans); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sx .v small { font: 500 12px var(--mono); color: var(--muted); margin-left: 4px; }
+  .sx .d { font: 11px/1.4 var(--mono); color: var(--dim); }
+  .sx .bar { height: 5px; border-radius: 99px; background: rgba(0,0,0,.35); overflow: hidden; }
+  .sx .bar i { display: block; height: 100%; width: 0; border-radius: 99px; background: var(--ok); transition: width .6s ease, background .6s; }
+  .sx .bar i.warn { background: var(--amber); } .sx .bar i.bad { background: var(--live); }
+  .sx.wide { grid-column: 1 / -1; }
+  .sx-tab { width: 100%; border-collapse: collapse; font: 12px var(--mono); }
+  .sx-tab th { text-align: left; font-weight: 500; color: var(--dim); padding: 2px 8px 6px 0; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; }
+  .sx-tab td { padding: 4px 8px 4px 0; border-top: 1px solid var(--stroke); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .sx-tab td:first-child { color: var(--ink); overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+  .sx-tab td.num, .sx-tab th.num { text-align: right; }
+  .sx-gpu { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted); }
+  .sx-gpu b { color: var(--ink); }
+  .sx-note { font-size: 11.5px; color: var(--dim); margin: 0; }
+
   /* ---------- responsive ---------- */
   @media (max-width: 1280px) {
     .grid { grid-template-columns: minmax(0, 1fr); }
@@ -654,6 +678,9 @@
   </div>
   <button class="logbtn" id="logbtn" onclick="abrirLogs()" title="ver los registros de la emisión">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-5-6-5M12 19h8"/></svg>Logs<span class="dot" id="logdot"></span>
+  </button>
+  <button class="logbtn" id="statsbtn" onclick="abrirStats()" title="uso del contenedor y del servidor: CPU, memoria, red, disco y gráfica">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Stats
   </button>
   <div class="clock" id="clock">--:--:--</div>
 </header>
@@ -838,6 +865,45 @@
   <div class="terminal">
     <div class="bar"><i></i><i></i><i></i><span id="log-name">STREAM.LOG</span><span style="margin-left:auto" id="log-upd"></span></div>
     <pre id="s-log">cargando…</pre>
+  </div>
+</aside>
+<aside class="drawer" id="statsdrawer" aria-label="Stats">
+  <div class="drawer-h">
+    <h2>Stats</h2>
+    <span class="pill" id="sx-upd" style="font: 11px var(--mono); color: var(--dim)">—</span>
+    <div class="right">
+      <button class="iconbtn" onclick="cerrarStats()" title="cerrar (Esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+  </div>
+  <div class="sx-body" id="sx-body">
+    <section class="sx-sec">
+      <h3>Contenedor de la radio <small id="sx-c-info"></small></h3>
+      <div class="sx-grid">
+        <div class="sx"><div class="k">CPU del contenedor</div><div class="v" id="sx-c-cpu">—</div><div class="bar"><i id="sx-c-cpu-b"></i></div><div class="d" id="sx-c-cpu-d"></div></div>
+        <div class="sx"><div class="k">Memoria del contenedor</div><div class="v" id="sx-c-mem">—</div><div class="bar"><i id="sx-c-mem-b"></i></div><div class="d" id="sx-c-mem-d"></div></div>
+        <div class="sx"><div class="k">Subida a la red</div><div class="v" id="sx-tx">—</div><div class="bar"><i id="sx-tx-b"></i></div><div class="d" id="sx-tx-d"></div></div>
+        <div class="sx"><div class="k">Codificador ffmpeg</div><div class="v" id="sx-ff">—</div><div class="bar"><i id="sx-ff-b"></i></div><div class="d" id="sx-ff-d"></div></div>
+      </div>
+    </section>
+    <section class="sx-sec">
+      <h3>Servidor <small id="sx-s-info"></small></h3>
+      <div class="sx-grid">
+        <div class="sx"><div class="k">CPU total</div><div class="v" id="sx-s-cpu">—</div><div class="bar"><i id="sx-s-cpu-b"></i></div><div class="d" id="sx-s-cpu-d"></div></div>
+        <div class="sx"><div class="k">Memoria</div><div class="v" id="sx-s-mem">—</div><div class="bar"><i id="sx-s-mem-b"></i></div><div class="d" id="sx-s-mem-d"></div></div>
+        <div class="sx"><div class="k">Carga del servidor</div><div class="v" id="sx-s-load">—</div><div class="bar"><i id="sx-s-load-b"></i></div><div class="d" id="sx-s-load-d"></div></div>
+        <div class="sx"><div class="k">Disco de datos (libre)</div><div class="v" id="sx-dk">—</div><div class="bar"><i id="sx-dk-b"></i></div><div class="d" id="sx-dk-d"></div></div>
+      </div>
+    </section>
+    <section class="sx-sec">
+      <h3>Gráfica</h3>
+      <div class="sx-grid"><div class="sx wide"><div class="sx-gpu" id="sx-gpu">—</div><p class="sx-note" id="sx-gpu-n"></p></div></div>
+    </section>
+    <section class="sx-sec">
+      <h3>Procesos del contenedor <small id="sx-p-info"></small></h3>
+      <div class="sx-grid"><div class="sx wide" style="padding:8px 14px">
+        <table class="sx-tab"><thead><tr><th>proceso</th><th class="num">pid</th><th class="num">cpu</th><th class="num">memoria</th></tr></thead><tbody id="sx-procs"></tbody></table>
+      </div></div>
+    </section>
   </div>
 </aside>
 <div class="modal" id="vmodal" onclick="if(event.target===this) cerrarVideo()"><div class="box" style="width:min(900px,100%); padding:14px">
@@ -1233,10 +1299,77 @@ function verLog(n) {
   $("s-log").textContent = "cargando…"; cargarLogs().then(() => { $("s-log").scrollTop = $("s-log").scrollHeight; });
 }
 function abrirLogs() {
-  $("logs").classList.add("open"); $("logbtn").classList.add("on");
+  cerrarStats(); $("logs").classList.add("open"); $("logbtn").classList.add("on");
   verLog(logActual); clearInterval(logTimer); logTimer = setInterval(cargarLogs, 2000);
 }
 function cerrarLogs() { $("logs").classList.remove("open"); $("logbtn").classList.remove("on"); clearInterval(logTimer); }
+// ---------------- Stats (uso del contenedor y del servidor) ----------------
+let statsTimer = null;
+const fmtB = b => b < 1024 ? b + " B" : b < 1048576 ? (b / 1024).toFixed(0) + " KB" : b < 1073741824 ? (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + " MB" : (b / 1073741824).toFixed(b < 10737418240 ? 2 : 1) + " GB";
+const fmtKbps = k => k >= 1000 ? (k / 1000).toFixed(2) + " Mbit/s" : k + " kbit/s";
+const fmtDur = s => { s = Math.max(0, Math.round(s)); const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60); return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`; };
+function sxBar(id, pct) { const i = $(id); pct = Math.max(0, Math.min(100, pct || 0)); i.style.width = pct + "%"; i.className = pct >= 90 ? "bad" : pct >= 70 ? "warn" : ""; }
+function pintarStats(x) {
+  const c = x.contenedor, s = x.servidor, r = x.red, d = x.disco, e = x.emision;
+  // contenedor
+  const cpuRel = c.cpu_pct / (c.cpu_limite * 100) * 100;   // respecto a lo que puede usar
+  $("sx-c-cpu").innerHTML = `${c.cpu_pct.toFixed(0)}<small>%</small>`;
+  sxBar("sx-c-cpu-b", cpuRel);
+  $("sx-c-cpu-d").textContent = `${(c.cpu_pct / 100).toFixed(2)} de ${c.cpu_limite} núcleos`;
+  $("sx-c-mem").innerHTML = `${fmtB(c.mem_rss)}`;
+  sxBar("sx-c-mem-b", c.mem / c.mem_limite * 100);
+  $("sx-c-mem-d").textContent = `+ ${fmtB(c.mem_cache)} caché · límite ${fmtB(c.mem_limite)}`;
+  $("sx-c-info").textContent = `${c.procesos} procesos · activo ${fmtDur(c.uptime)}`;
+  $("sx-tx").textContent = fmtKbps(r.tx_kbps);
+  sxBar("sx-tx-b", e.running ? r.tx_kbps / ((e.kbps + 160) * (e.mode === "directo" ? 2 : 1)) * 100 : 0);
+  $("sx-tx-d").textContent = `bajada ${fmtKbps(r.rx_kbps)} · ${fmtB(r.tx_total)} enviados en total`;
+  const ff = e.ffmpeg;
+  if (e.running && ff) {
+    $("sx-ff").innerHTML = `${ff.fps.toFixed(0)}<small>fps</small> · ${ff.velocidad.toFixed(2)}<small>x</small>`;
+    sxBar("sx-ff-b", ff.velocidad * 100);
+    $("sx-ff-b").className = ff.velocidad < 0.97 ? "bad" : ff.velocidad < 0.995 ? "warn" : "";
+    $("sx-ff-d").textContent = `h264 ${e.kbps} kbps · q ${ff.q} · ${ff.tiempo.replace(/\.\d+$/, "")} emitidos`;
+  } else {
+    $("sx-ff").textContent = e.running ? "arrancando…" : "parado"; sxBar("sx-ff-b", 0); $("sx-ff-d").textContent = e.running ? "esperando la primera línea de progreso" : "la emisión no está en marcha";
+  }
+  // servidor
+  $("sx-s-cpu").innerHTML = `${s.cpu_pct.toFixed(0)}<small>%</small>`;
+  sxBar("sx-s-cpu-b", s.cpu_pct);
+  $("sx-s-cpu-d").textContent = `${s.ncpu} núcleos · la radio supone el ${(c.cpu_pct / s.ncpu).toFixed(0)} %`;
+  const usada = s.mem_total - s.mem_disponible;
+  $("sx-s-mem").innerHTML = `${fmtB(usada)}`;
+  sxBar("sx-s-mem-b", usada / s.mem_total * 100);
+  $("sx-s-mem-d").textContent = `de ${fmtB(s.mem_total)}` + (s.swap_total ? ` · swap ${fmtB(s.swap_total - s.swap_libre)}` : " · sin swap");
+  $("sx-s-load").innerHTML = `${s.carga[0].toFixed(2)}<small>1 min</small>`;
+  sxBar("sx-s-load-b", s.carga[0] / s.ncpu * 100);
+  $("sx-s-load-d").textContent = `5 min ${s.carga[1].toFixed(2)} · 15 min ${s.carga[2].toFixed(2)} · ` + (s.carga[0] > s.ncpu ? "por encima de los núcleos: hay espera" : "dentro de la capacidad");
+  $("sx-s-info").textContent = `encendido ${fmtDur(s.uptime)}`;
+  $("sx-dk").textContent = fmtB(d.libre);
+  sxBar("sx-dk-b", d.usado / d.total * 100);
+  $("sx-dk-d").textContent = `música ${fmtB(d.musica)} (${d.n_musica}) · videos ${fmtB(d.videos)} (${d.n_videos}) · logs ${fmtB(d.logs)}`;
+  // gráfica
+  const g = x.gpu, hw = g.render.length > 0;
+  const nombres = g.tarjetas.map(tj => `<b>${tj.vendedor}</b>${tj.driver ? ` <span style="color:var(--dim)">(${tj.driver})</span>` : ""}${tj.mhz ? ` · ${tj.mhz}/${tj.mhz_max} MHz` : ""}`);
+  $("sx-gpu").innerHTML = `<span class="pill ${hw ? "on" : ""}">${hw ? "disponible" : g.tarjetas.length ? "sin aceleración" : "no detectada"}</span>` +
+    (nombres.length ? nombres.join(" · ") : "el contenedor no ve ninguna gráfica") + ` · codifica con <b>${g.codificador}</b>`;
+  $("sx-gpu-n").textContent = hw
+    ? `Hay nodo de render (${g.render.join(", ")}): la gráfica puede codificar por hardware. La emisión aún usa la CPU.`
+    : g.tarjetas.length ? "Solo hay una salida de pantalla, sin nodo de render: esta gráfica no puede codificar video (habitual en máquinas virtuales)."
+    : "Para cederla al contenedor, descomenta el bloque «GPU integrada» del docker-compose.yml.";
+  // procesos
+  $("sx-procs").innerHTML = x.procesos.map(pr => `<tr><td title="${pr.nombre}">${pr.nombre}</td><td class="num">${pr.pid}</td><td class="num">${pr.cpu_pct.toFixed(1)} %</td><td class="num">${fmtB(pr.rss)}</td></tr>`).join("");
+  $("sx-p-info").textContent = `los ${x.procesos.length} que más CPU usan`;
+  $("sx-upd").textContent = "actualizado " + new Date().toLocaleTimeString("es-ES");
+}
+async function cargarStats() {
+  try { pintarStats(await (await fetch("/api/stats", {cache: "no-store"})).json()); }
+  catch (e) { $("sx-upd").textContent = "sin respuesta del servidor"; }
+}
+function abrirStats() {
+  cerrarLogs(); $("statsdrawer").classList.add("open"); $("statsbtn").classList.add("on");
+  cargarStats(); clearInterval(statsTimer); statsTimer = setInterval(cargarStats, 2000);
+}
+function cerrarStats() { $("statsdrawer").classList.remove("open"); $("statsbtn").classList.remove("on"); clearInterval(statsTimer); }
 function copiarLog() { navigator.clipboard?.writeText($("s-log").textContent).then(() => toast("Log copiado"), () => toast("No se pudo copiar", true)); }
 let youtubeUrl = "";
 async function editarYoutube() {
@@ -1251,7 +1384,7 @@ function copiarVlc() { navigator.clipboard?.writeText($("s-vlcurl").textContent)
 document.addEventListener("keydown", e => {
   if (e.key !== "Escape") return;
   if (cerrarConfirmar) cerrarConfirmar();
-  cerrarLogs(); cerrarComponer(); cerrarSubida(); cerrarVideo(); cerrarPixabay();
+  cerrarLogs(); cerrarStats(); cerrarComponer(); cerrarSubida(); cerrarVideo(); cerrarPixabay();
 });
 function abrirComponer(e) { e.stopPropagation(); $("g-pop").classList.toggle("open"); $("g-open").classList.toggle("on", $("g-pop").classList.contains("open")); }
 function cerrarComponer() { $("g-pop").classList.remove("open"); $("g-open").classList.remove("on"); }

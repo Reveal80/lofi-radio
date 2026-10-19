@@ -20,6 +20,8 @@ Toda la interfaz está en español.
   previa, y un vigilante relanza la emisión si el codificador se cae. Modo *local* para probar sin clave
   y modo *directo* para YouTube.
 - **Vista previa**: reproductor del directo dentro del panel y acceso por RTSP para VLC.
+- **Stats**: uso de CPU, memoria, red y disco del contenedor y del servidor, estado de la gráfica y
+  velocidad del codificador, en un panel lateral que se actualiza cada 2 segundos.
 
 ## Puesta en marcha
 
