@@ -970,9 +970,12 @@ def _procesos():
         rss = int(campos[21]) * pagina
         args = [a.decode(errors="replace") for a in cmd if a]
         if nombre in ("python", "python3", "bash", "sh"):
-            script = next((a for a in args[1:] if not a.startswith("-")), None)   # salta -u, -c…
-            if script:
-                nombre = f"{nombre} {Path(script).name}"   # app.py / videofeeder.py / audiofeeder.py
+            if "-c" in args[1:]:   # «bash -c "ffmpeg … ; kill 0"»: el lanzador de la emisión
+                nombre = f"{nombre} (lanzador de la emisión)"
+            else:
+                script = next((a for a in args[1:] if not a.startswith("-")), None)   # salta -u…
+                if script:
+                    nombre = f"{nombre} {Path(script).name}"   # app.py / videofeeder.py / audiofeeder.py
         out[int(d.name)] = {"nombre": nombre, "ticks": ticks, "rss": rss}
     return out
 
