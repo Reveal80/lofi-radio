@@ -389,9 +389,8 @@
 
   /* ---------- música: canción del directo ---------- */
   .mtools { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 10px; padding: 0 10px 12px; }
-  #pane-videos .mtools { grid-template-columns: minmax(0,1fr) auto auto auto; }
+  #pane-videos .mtools, #pane-musica .mtools { grid-template-columns: minmax(0,1fr) auto auto auto; }
   .vinf-chip i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
-  .hdr-musica { display: flex; gap: 6px; margin-left: 8px; } .hdr-musica[hidden] { display: none; }
   .btn.inf { gap: 7px; } .btn.inf svg { width: 18px; height: 18px; }
   .btn.inf.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
   .btn.inf.on svg { animation: spin 6s linear infinite; }
@@ -765,11 +764,6 @@
             <p class="hint" style="margin:10px 0 0; font-size:12px">Se detecta solo: el audio va a <b>Música</b> (entra en el directo al azar); los videos y las imágenes a <b>Videos</b>, desactivados hasta que actives «en bucle». Una imagen se convierte en un video fijo de 10 s sin audio, que ocupa muy poco.</p>
           </div>
         </div>
-        <div class="hdr-musica" id="hdr-musica" hidden>
-        <button class="btn sm inf" id="m-inf" onclick="alternarInfinita()" title="Radio infinita: compone música lofi en tiempo real, sin fin y sin usar la lista" aria-pressed="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.2 8a4 4 0 1 1 0 8c-3.3 0-5.1-8-12.4-8a4 4 0 1 0 0 8c3.3 0 5.1-8 12.4-8"/></svg>Radio infinita
-        </button>
-        </div>
         <div class="field search">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--dim)" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           <input id="q" placeholder="Buscar video…" oninput="filtrar()">
@@ -787,6 +781,9 @@
           </button>
           <button class="btn sm shuffle" id="m-shuffle" onclick="alternarAleatorio('musica')" title="Activa el modo aleatorio de la lista: las canciones descargadas sonarán en orden aleatorio" aria-pressed="false">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+          </button>
+          <button class="btn sm inf" id="m-inf" onclick="alternarInfinita()" title="Radio infinita: compone música lofi en tiempo real, sin fin y sin usar la lista" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.2 8a4 4 0 1 1 0 8c-3.3 0-5.1-8-12.4-8a4 4 0 1 0 0 8c3.3 0 5.1-8 12.4-8"/></svg>Radio infinita
           </button>
         </div>
         <div class="infpanel" id="inf-panel" hidden>
@@ -1698,7 +1695,6 @@ function verTab(t) {
   tabActual = t;
   document.querySelectorAll(".tab[data-tab]").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
   $("pane-musica").hidden = t !== "musica"; $("pane-videos").hidden = t !== "videos";
-  $("hdr-musica").hidden = t !== "musica";   // aleatorio y radio infinita, junto a «Subir», solo en Música
   $("q").placeholder = t === "musica" ? "Buscar canción…" : "Buscar video…";
   filtrar();
 }
