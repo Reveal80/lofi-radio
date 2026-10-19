@@ -115,9 +115,9 @@ def _render_worker(req, res):
         item = req.get()
         if item is None:
             return
-        rid, prev, estilo, bpm, fondo, seed = item
+        rid, prev, estilo, bpm, fondo, quitar, anadir, seed = item
         try:
-            tema = lofigen.tema_siguiente(prev, seed, estilo, bpm or None)
+            tema = lofigen.tema_siguiente(prev, seed, estilo, bpm or None, quitar, anadir)
             cuerpo, cola = lofigen.render_theme(tema, 1, seed, continuo=True, fondo=fondo)
             res.put((rid, tema, cuerpo.astype(np.float32), cola.astype(np.float32)))
         except Exception as e:   # un tramo fallido no tumba la radio: se pide otro
@@ -148,11 +148,11 @@ class RadioInfinita:
         self.proc = None
         self.tema = None
 
-    def pedir(self, estilo, bpm, fondo=0):
+    def pedir(self, estilo, bpm, fondo=0, inst=((), ())):
         self.arrancar()
         self.rid += 1
         self.seed += 1
-        self.req.put((self.rid, self.tema, estilo, int(bpm or 0), float(fondo), self.seed))
+        self.req.put((self.rid, self.tema, estilo, int(bpm or 0), float(fondo), tuple(inst[0]), tuple(inst[1]), self.seed))
 
     def recoger(self, timeout=0):
         """El tramo de la última petición si ya está (tema, cuerpo, cola); None si no."""
@@ -204,7 +204,8 @@ def tocar_infinita(cfg):
     estilo, desde = _elegir_estilo(cfg, None, 0, False)
     bpm = int(cfg.get("bpm") or 0)
     fondo = lambda c: .35 if c.get("textura") else 0   # textura de fondo opcional, y baja
-    radio.pedir(estilo, bpm, fondo(cfg))
+    inst = lambda c: (tuple(c.get("inst_quitar") or ()), tuple(c.get("inst_anadir") or ()))
+    radio.pedir(estilo, bpm, fondo(cfg), inst(cfg))
     paso = SR // 10                                    # 0,1 s por escritura
     nombres = {}
     try:
@@ -212,7 +213,7 @@ def tocar_infinita(cfg):
         nombres = {k: e["nombre"] for k, e in lofigen.ESTILOS.items()}
     except Exception:
         pass
-    fon = fondo(cfg)
+    fon, ins = fondo(cfg), inst(cfg)
     siguiente = None                                   # tramo ya recogido que entra en el corte
     try:
         while True:
@@ -226,8 +227,8 @@ def tocar_infinita(cfg):
                 if not cfg:
                     return
                 e2, desde = _elegir_estilo(cfg, estilo, desde, False)
-                if (e2, int(cfg.get("bpm") or 0), fondo(cfg)) != (estilo, bpm, fon):
-                    estilo, bpm, fon = e2, int(cfg.get("bpm") or 0), fondo(cfg); radio.pedir(estilo, bpm, fon)
+                if (e2, int(cfg.get("bpm") or 0), fondo(cfg), inst(cfg)) != (estilo, bpm, fon, ins):
+                    estilo, bpm, fon, ins = e2, int(cfg.get("bpm") or 0), fondo(cfg), inst(cfg); radio.pedir(estilo, bpm, fon, ins)
                 listo = radio.recoger(timeout=.05)
             tema, cuerpo, cola = listo
             if cola_pendiente is not None and len(cola_pendiente):
@@ -239,7 +240,7 @@ def tocar_infinita(cfg):
             rotar_min = max(1, int(cfg.get("rotar_min") or 60))
             # el siguiente se compone mientras suena este (y es donde rota el estilo si toca)
             estilo_sig, desde_sig = _elegir_estilo(cfg, estilo, desde, True)
-            radio.pedir(estilo_sig, bpm, fon)
+            radio.pedir(estilo_sig, bpm, fon, ins)
             compas = int(4 * 60 / tema["bpm"] * SR)
             escribir_actual({"name": "radio-infinita", "inicio": time.time(), "dur": len(cuerpo) / SR,
                              "infinita": {"n": radio.n, "estilo": estilo,
@@ -264,11 +265,11 @@ def tocar_infinita(cfg):
                         return
                     cfg = ahora
                     e2, desde = _elegir_estilo(cfg, estilo, desde, False)
-                    b2, f2 = int(cfg.get("bpm") or 0), fondo(cfg)
-                    if (e2, b2, f2) != (estilo, bpm, fon) or SALTAR.exists():
+                    b2, f2, i2 = int(cfg.get("bpm") or 0), fondo(cfg), inst(cfg)
+                    if (e2, b2, f2, i2) != (estilo, bpm, fon, ins) or SALTAR.exists():
                         SALTAR.unlink(missing_ok=True)
-                        estilo, bpm, fon = e2, b2, f2
-                        radio.pedir(estilo, bpm, fon)
+                        estilo, bpm, fon, ins = e2, b2, f2, i2
+                        radio.pedir(estilo, bpm, fon, ins)
                         nuevo = False                  # esperando el tramo con los ajustes nuevos
                 if nuevo is False:
                     r = radio.recoger()

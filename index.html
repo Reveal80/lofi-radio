@@ -398,6 +398,14 @@
   .infpanel .ih b { color: var(--ink); }
   .infpanel .ih small { margin-left: auto; font: 11px var(--mono); color: var(--dim); }
   .infpanel .escenas { grid-template-columns: repeat(8, 1fr); }
+  .inf-inst { display: flex; align-items: flex-start; gap: 10px; font-size: 12.5px; color: var(--muted); }
+  .inf-inst > span { padding-top: 3px; white-space: nowrap; }
+  .inf-inst .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .inf-inst .chip { cursor: pointer; opacity: .4; text-decoration: line-through; transition: all .15s; }
+  .inf-inst .chip:hover { opacity: .8; }
+  .inf-inst .chip.on { opacity: 1; text-decoration: none; color: var(--ink); border-color: var(--stroke-2); }
+  .inf-inst .chip.extra { color: var(--amber); border-color: rgba(255,179,92,.45); background: rgba(255,179,92,.1); }
+  .inf-inst .chip.suena { color: var(--ok); border-color: rgba(94,230,160,.5); background: rgba(94,230,160,.12); box-shadow: 0 0 0 2px rgba(94,230,160,.15); }
   .inf-tempo { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted); }
   .inf-tempo input[type=range] { max-width: 320px; height: 20px; }
   .inf-tempo input[type=range]::-webkit-slider-runnable-track { height: 6px; background: linear-gradient(90deg, var(--ok) 0, var(--amber) var(--p), rgba(255,255,255,.14) var(--p)); }
@@ -781,6 +789,7 @@
           <div class="ih"><b>Radio infinita</b><span>la música se compone sola mientras suena. Marca uno o varios estilos (con varios, va rotando) y el tempo; los cambios entran en el siguiente compás</span><small id="inf-now"></small></div>
           <div class="escenas" id="inf-estilos"></div>
           <div class="inf-rota" id="inf-rota" hidden><span>Con varios estilos:</span><button class="chip" data-min="0" title="Un solo estilo que suma los marcados: instrumentos, ritmos y tempos de todos ellos">Mezclar</button><span style="color:var(--dim)">o cambiar cada</span><button class="chip" data-min="15">15 min</button><button class="chip" data-min="30">30 min</button><button class="chip" data-min="60">1 h</button><button class="chip" data-min="120">2 h</button><button class="chip" data-min="240">4 h</button><small id="inf-rota-txt"></small></div>
+          <div class="inf-inst"><span title="Los del estilo van marcados; pulsa uno para quitarlo o para añadir otro. Entra en el siguiente tramo">Instrumentos</span><div class="chips" id="inf-inst-chips"></div></div>
           <div class="inf-tempo">
             <span>Tempo</span><span class="lim">50</span>
             <input type="range" id="inf-bpm" min="50" max="110" step="1" value="76" aria-label="tempo en bpm">
@@ -1961,6 +1970,17 @@ function pintarInfinita(d, estilos) {
     : i?.rota_en && sel.size > 1 ? `ahora ${nom(i.estilo)} · luego ${nom(i.siguiente || sig(d.estilos, i.estilo))} en ${Math.max(0, Math.ceil((i.rota_en - Date.now() / 1000) / 60))} min` : "";
   $("inf-auto").classList.toggle("on", !d.bpm);
   $("inf-tex").classList.toggle("on", !!d.textura);
+  // instrumentos: los del estilo (más los añadidos, menos los quitados); los que suenan ahora, en verde
+  const chips = $("inf-inst-chips");
+  if (!chips.childElementCount && d.instrumentos)
+    chips.innerHTML = Object.entries(d.instrumentos).map(([k, n]) => `<button class="chip" data-inst="${esc(k)}">${esc(n)}</button>`).join("");
+  const quitar = new Set(d.inst_quitar || []), anadir = new Set(d.inst_anadir || []), base = new Set(d.inst_estilo || []);
+  const suena = new Set([i?.inst, i?.instMel].filter(Boolean));
+  chips.querySelectorAll(".chip").forEach(c => {
+    const k = c.dataset.inst, on = (base.has(k) || anadir.has(k)) && !quitar.has(k);
+    c.classList.toggle("on", on); c.classList.toggle("extra", on && anadir.has(k) && !base.has(k)); c.classList.toggle("suena", suena.has(k));
+    c.title = suena.has(k) ? "suena ahora · pulsa para quitarlo" : on ? (anadir.has(k) && !base.has(k) ? "añadido por ti · pulsa para quitarlo" : "lo usa el estilo · pulsa para quitarlo") : "no suena · pulsa para añadirlo";
+  });
   if (!infArrastrando) {
     const vivo = ultimoEstado?.musica?.infinita?.bpm;
     $("inf-bpm").value = d.bpm || vivo || 76; pintarTempo();
@@ -1987,6 +2007,13 @@ $("inf-estilos").addEventListener("click", e => {
   const lista = [...document.querySelectorAll("#inf-estilos .escena")].map(x => x.dataset.estilo).filter(x => sel.has(x));   // en el orden de los botones
   const nombre = b.querySelector(".en").textContent;
   ajustarInfinita({estilos: lista}, sel.has(k) ? (lista.length > 1 ? `${nombre} añadido a la rotación` : `Cambiando a ${nombre}: entra en el siguiente compás`) : `${nombre} quitado de la rotación`);
+});
+$("inf-inst-chips").addEventListener("click", e => {
+  const c = e.target.closest(".chip"); if (!c || !infinita) return;
+  const k = c.dataset.inst, on = c.classList.contains("on");
+  const quitar = new Set(infinita.inst_quitar || []), anadir = new Set(infinita.inst_anadir || []);
+  if (on) { anadir.delete(k); quitar.add(k); } else { quitar.delete(k); anadir.add(k); }
+  ajustarInfinita({inst_quitar: [...quitar], inst_anadir: [...anadir]}, `${c.textContent} ${on ? "quitado" : "añadido"}: entra en el siguiente tramo`);
 });
 $("inf-rota").addEventListener("click", e => {
   const c = e.target.closest(".chip"); if (!c) return;

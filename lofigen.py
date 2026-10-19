@@ -617,6 +617,32 @@ ESTILOS = {
 }
 
 
+INST_NOMBRES = {   # los que el usuario puede quitar o añadir en la radio infinita (bonshō y caja no: son efectos)
+    "rhodes": "Rhodes", "piano": "Piano", "vibra": "Vibráfono", "pad": "Pad", "pulso": "Sinte", "chip": "Chip 8 bits",
+    "guitarra": "Guitarra", "flauta": "Flauta", "campana": "Campana", "saxo": "Saxo", "trompeta": "Trompeta",
+    "clarinete": "Clarinete", "koto": "Koto", "shakuhachi": "Shakuhachi", "cuenco": "Cuenco",
+}
+
+
+def instrumentos_de(estilos):
+    """Instrumentos (acordes + melodía) que pueden sonar con esos estilos, en el orden de INST_NOMBRES."""
+    usados = set()
+    for e in estilos:
+        E = estilo_de(e)
+        usados.update(E.get("inst", TODOS["inst"])); usados.update(E.get("instMel", TODOS["instMel"]))
+    return [k for k in INST_NOMBRES if k in usados]
+
+
+def con_instrumentos(E, quitar=(), anadir=()):
+    """Copia del estilo con los instrumentos que el usuario quita o añade (acordes y melodía)."""
+    E = dict(E)
+    for k in ("inst", "instMel"):
+        base = E.get(k, TODOS[k])
+        lista = [x for x in base if x not in quitar] + [x for x in anadir if x not in base and x in INST_NOMBRES]
+        E[k] = lista or [x for x in TODOS[k] if x not in quitar] or list(TODOS[k])
+    return E
+
+
 def estilo_de(nombre):
     """Estilo por nombre; «chill+jazz» es la mezcla de varios: se suman sus listas de
     instrumentos, baterías…, y los rangos (tempo, swing, sala) y probabilidades se promedian."""
@@ -643,10 +669,10 @@ def estilo_de(nombre):
     return M
 
 
-def tema_aleatorio(seed, estilo="aleatorio"):
+def tema_aleatorio(seed, estilo="aleatorio", E=None):
     """Compone un tema nuevo con las reglas del motor de referencia,
-    acotado por el estilo elegido (o mezcla «a+b»)."""
-    E = estilo_de(estilo)
+    acotado por el estilo elegido (o mezcla «a+b»), o por el dict E ya preparado."""
+    E = E or estilo_de(estilo)
     rng = np.random.default_rng(seed)
     elige = lambda clave: str(rng.choice(E.get(clave, TODOS[clave])))
     menor = rng.random() < E.get("menor", .45)
@@ -712,14 +738,14 @@ _GRUPOS = {   # parámetros que viajan juntos al pasar de un tramo al siguiente
 _ACOTADOS = ("inst", "instMel", "bat", "bajo", "tex", "comp")   # listas que cada estilo restringe
 
 
-def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None):
+def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None, quitar=(), anadir=()):
     """Compone el tramo siguiente de la radio infinita: hereda casi todo del anterior y cambia
     uno o dos grupos de parámetros. Si el estilo pedido no admite algo del tramo anterior
     (instrumento, batería…), lo va acercando al estilo de dos en dos cosas por tramo, así el
     cambio de estilo se nota poco a poco. bpm fijo si se da; si no, deriva dentro del estilo."""
-    E = estilo_de(estilo)
+    E = con_instrumentos(estilo_de(estilo), quitar, anadir)
     rng = np.random.default_rng(seed)
-    nuevo = tema_aleatorio(int(rng.integers(1 << 30)), estilo)
+    nuevo = tema_aleatorio(int(rng.integers(1 << 30)), estilo, E)
     if prev is None:
         T = nuevo
     else:

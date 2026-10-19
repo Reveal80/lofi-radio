@@ -619,7 +619,8 @@ def api_aleatorio():
 
 # Radio infinita: música procedural compuesta en tiempo real en vez de la lista (audiofeeder.py).
 INFINITA_FILE = TRACKS_DIR / "infinita.json"
-INFINITA_DEF = {"activo": False, "estilos": ["aleatorio"], "rotar_min": 60, "bpm": 0, "textura": False}   # bpm 0 = automático
+INFINITA_DEF = {"activo": False, "estilos": ["aleatorio"], "rotar_min": 60, "bpm": 0, "textura": False,
+                "inst_quitar": [], "inst_anadir": []}   # bpm 0 = automático
 ROTAR_MIN = (0, 15, 30, 60, 120, 240)   # 0 = mezclar los estilos marcados en vez de rotar
 
 
@@ -633,12 +634,16 @@ def estado_infinita(cfg=None):
     d["rotar_min"] = int(d["rotar_min"]) if d["rotar_min"] in ROTAR_MIN else 60
     d["bpm"] = int(d["bpm"]) if str(d["bpm"]).isdigit() and 50 <= int(d["bpm"]) <= 110 else 0
     d["textura"] = bool(d.get("textura"))   # vinilo/lluvia de fondo; apagado por defecto (sonaba a ruido blanco)
+    for k in ("inst_quitar", "inst_anadir"):
+        d[k] = [x for x in (d.get(k) or []) if x in lofigen.INST_NOMBRES]
+    d["inst_estilo"] = lofigen.instrumentos_de(d["estilos"])   # los que usarían los estilos marcados (informativo)
+    d["instrumentos"] = lofigen.INST_NOMBRES
     return d
 
 
 def aplicar_infinita(d):
     with _io_lock:
-        escribir_json(INFINITA_FILE, d)
+        escribir_json(INFINITA_FILE, {k: v for k, v in d.items() if k not in ("inst_estilo", "instrumentos")})
 
 
 aplicar_infinita(estado_infinita())   # al arrancar, según la configuración guardada
@@ -663,6 +668,12 @@ def api_infinita():
         d["rotar_min"] = int(data["rotar_min"])
     if "textura" in data:
         d["textura"] = bool(data["textura"])
+    for k in ("inst_quitar", "inst_anadir"):
+        if k in data:
+            lista = data[k] or []
+            if not isinstance(lista, list) or any(x not in lofigen.INST_NOMBRES for x in lista):
+                return jsonify(error="instrumento desconocido"), 400
+            d[k] = list(dict.fromkeys(lista))
     if "bpm" in data:
         try:
             bpm = int(data["bpm"] or 0)
@@ -671,9 +682,9 @@ def api_infinita():
         if bpm and not 50 <= bpm <= 110:
             return jsonify(error="el tempo va de 50 a 110 bpm (0 = automático)"), 400
         d["bpm"] = bpm
-    actualizar_config(infinita=d)
+    actualizar_config(infinita={k: v for k, v in d.items() if k not in ("inst_estilo", "instrumentos")})
     aplicar_infinita(d)
-    return jsonify(ok=True, infinita=d)
+    return jsonify(ok=True, infinita=estado_infinita())
 
 
 @app.post("/api/youtube_url")
