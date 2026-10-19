@@ -683,11 +683,12 @@ def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None):
     return T
 
 
-def generate_random(seed, outdir, estilo="aleatorio"):
-    """Compone y renderiza un tema nuevo del estilo dado; devuelve (ruta WAV, tema)."""
+def generate_random(seed, outdir, estilo="aleatorio", fondo=1.0):
+    """Compone y renderiza un tema nuevo del estilo dado; devuelve (ruta WAV, tema).
+    fondo 0 = sin textura de vinilo/lluvia/cinta."""
     from pathlib import Path
     tema = tema_aleatorio(seed, estilo)
-    audio = render_theme(tema, cycles=2, seed=seed)
+    audio = render_theme(tema, cycles=2, seed=seed, fondo=fondo)
     out = Path(outdir) / f"nuevo_{seed:06d}.wav"
     wavfile.write(str(out), SR, (audio * 32767).astype(np.int16))
     return out, tema

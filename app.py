@@ -200,7 +200,7 @@ def titulo_random(rng):
     return f"{rng.choice(_T_COSAS).capitalize()} y {rng.choice(_T_COSAS)} {rng.choice(_T_ESTADOS)}"
 
 
-def gen_job(count, estilo="aleatorio"):
+def gen_job(count, estilo="aleatorio", fondo=1.0):
     rng = random.Random()
     try:
         for i in range(count):
@@ -209,7 +209,7 @@ def gen_job(count, estilo="aleatorio"):
             parcial, wav = mp3.with_suffix(".part"), None
             gen_state["current"] = f"componiendo «{titulo}» ({i + 1}/{count})"
             try:
-                wav, tema = lofigen.generate_random(random.randrange(1, 1_000_000), TRACKS_DIR, estilo)
+                wav, tema = lofigen.generate_random(random.randrange(1, 1_000_000), TRACKS_DIR, estilo, fondo)
                 etiqueta = f"{tema['inst']} · {tema['bat']} · {tema.get('modo', 'mayor')} · {tema['bpm']} bpm"
                 if estilo != "aleatorio":
                     etiqueta = f"{lofigen.ESTILOS[estilo]['nombre']} · {etiqueta}"
@@ -239,11 +239,12 @@ def api_generate():
     estilo = data.get("estilo", "aleatorio")
     if estilo not in lofigen.ESTILOS:
         return jsonify(error="estilo de música no válido"), 400
+    fondo = 0.0 if data.get("sin_fondo") else 1.0   # «Sin ruido de fondo» del panel: quita vinilo/lluvia/cinta
     with _lock:
         if gen_state["running"]:
             return jsonify(error="ya hay una generación en curso"), 409
         gen_state.update(running=True, done=0, total=count, error="")
-    threading.Thread(target=gen_job, args=(count, estilo), daemon=True).start()
+    threading.Thread(target=gen_job, args=(count, estilo, fondo), daemon=True).start()
     return jsonify(ok=True)
 
 

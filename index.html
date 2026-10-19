@@ -409,6 +409,8 @@
   .inf-tempo .btn.sm.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
   #inf-tex { font-size: 12px; }
   .infpanel .now { font: 11.5px var(--mono); color: var(--dim); }
+  .optrow { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
+  .optrow small { color: var(--dim); }
   .inf-rota { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
   .inf-rota .chip { cursor: pointer; } .inf-rota .chip:hover { color: var(--ink); border-color: var(--stroke-2); }
   .inf-rota .chip.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
@@ -664,7 +666,8 @@
       </div>
       <div id="comp-musica">
         <p class="hint">Elige un estilo: marca el tempo, los instrumentos y el ritmo. Dentro de él, cada canción nace desde cero.</p>
-        <div class="escenas" id="m-estilos" style="margin-bottom:12px"></div>
+        <div class="escenas" id="m-estilos" style="margin-bottom:10px"></div>
+        <label class="optrow" title="Las canciones salen sin la textura de fondo (vinilo, lluvia o cinta), que suena como un siseo"><label class="switch"><input type="checkbox" id="g-sinfondo" checked onchange="try{localStorage.setItem('g-sinfondo', this.checked ? '1' : '0')}catch(e){}"><span></span></label><span>Sin ruido de fondo <small>(vinilo, lluvia o cinta)</small></span></label>
         <div class="genrow">
           <div class="stepper">
             <button onclick="step(-1)" aria-label="menos">−</button>
@@ -1583,12 +1586,13 @@ function stepE(d) { const o = $("e-count"); o.value = o.textContent = Math.max(1
 function abrirSubida(e) { e.stopPropagation(); $("up-pop").classList.toggle("open"); $("up-open").classList.toggle("on", $("up-pop").classList.contains("open")); }
 function cerrarSubida() { $("up-pop").classList.remove("open"); $("up-open").classList.remove("on"); }
 document.addEventListener("click", e => { if (!e.target.closest("#up-wrap")) cerrarSubida(); });
+try { if (localStorage.getItem("g-sinfondo") === "0") $("g-sinfondo").checked = false; } catch (e) {}
 function step(d) { const o = $("g-count"); o.value = o.textContent = Math.max(1, Math.min(20, +o.textContent + d)); }
 
 async function generar() {
   $("g-err").textContent = "";
   const n = +$("g-count").textContent, nombre = estilosMusica[estiloMusica]?.nombre || "";
-  try { await post("/api/generate", {count: n, estilo: estiloMusica}); toast(`Componiendo ${n} ${n === 1 ? "canción" : "canciones"}${estiloMusica !== "aleatorio" ? " · " + nombre : ""}…`); }
+  try { await post("/api/generate", {count: n, estilo: estiloMusica, sin_fondo: $("g-sinfondo").checked}); toast(`Componiendo ${n} ${n === 1 ? "canción" : "canciones"}${estiloMusica !== "aleatorio" ? " · " + nombre : ""}…`); }
   catch (e) { $("g-err").textContent = e.message; }
   refresh();
 }
