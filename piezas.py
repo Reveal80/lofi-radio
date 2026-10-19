@@ -23,7 +23,6 @@ import time
 import numpy as np
 
 import lofigen as L
-import muestras
 from lofigen import SR
 
 VARIEDADES = ("bajo", "medio", "alto")
@@ -673,7 +672,6 @@ class Compositor:
         if nueva:
             p = self.nueva(estilo, E, variedad, bpm, melodia, seed, continuar, capas)
         S = p["secciones"][self.idx]
-        p["muestras"] = bool(opc.get("muestras", True))   # instrumentos reales (banco de sonidos) si los hay
         self.ultimo = (self.idx, self.segundos)
         cuerpo, cola = render_seccion(p, S, seed, fondo)
         antes = self.segundos
@@ -709,45 +707,26 @@ def _ganancia(p, seed):
 
 
 class _Salida:
-    """Quién toca las notas: los sintetizadores de lofigen o, si la pieza lo pide y hay banco de sonidos,
-    las muestras reales (muestras.Grabador). Misma interfaz para el render."""
+    """Quién toca las notas (los sintetizadores de lofigen). En la 3.0 hubo una variante con muestras
+    reales por FluidSynth; el usuario la descartó en la 3.2 («no me ha gustado, que ocupe menos»)."""
 
     def __init__(self, p):
         self.p = p
-        self.G = muestras.Grabador() if (p.get("muestras") and muestras.disponible()) else None
 
     def nota(self, buf, inst, m, t, dur, vol, cinta=False):
-        if self.G and inst in muestras.PROGRAMAS:
-            self.G.nota(buf, inst, m, t, dur, vol)
-        else:
-            L.tocar_nota(buf, inst, m, t, dur, vol, cinta)
+        L.tocar_nota(buf, inst, m, t, dur, vol, cinta)
 
     def bajo(self, buf, m, t, dur, vol):
-        if self.G:
-            self.G.bajo(buf, self.p["bajoTimbre"], m, t, dur, vol, self.p["bajoNivel"])
-        else:
-            L.bajo_nota(buf, m, t, dur, vol)
+        L.bajo_nota(buf, m, t, dur, vol)
 
     def bombo(self, buf, t, vol, kicks):
-        if self.G:
-            self.G.bombo(buf, t, vol)
-            kicks.append(t)
-        else:
-            L.bombo(buf, t, vol, kicks)
+        L.bombo(buf, t, vol, kicks)
 
     def golpe(self, buf, t, vol, tipo, frec, dur):
-        if self.G:
-            self.G.golpe(buf, t, vol, tipo, frec, dur)
-        else:
-            L.golpe(buf, t, vol, tipo, frec, dur)
+        L.golpe(buf, t, vol, tipo, frec, dur)
 
     def volcar(self, bus, melb, resto, bat, padb):
-        if self.G:   # niveles medidos frente a los sintetizadores, para que la mezcla no cambie
-            self.G.volcar({id(bus): GAN_MUESTRAS["acordes"], id(melb): GAN_MUESTRAS["melodia"], id(resto): GAN_MUESTRAS["resto"],
-                           id(bat): GAN_MUESTRAS["bateria"], id(padb): GAN_MUESTRAS["pad"]})
-
-
-GAN_MUESTRAS = dict(acordes=.8, melodia=1.2, resto=.4, bateria=1.8, pad=1.0)   # medidos frente a los sintes (3.0)
+        pass
 
 
 def render_seccion(p, S, seed, fondo=0.0):
@@ -846,7 +825,7 @@ def render_seccion(p, S, seed, fondo=0.0):
                 sal.nota(melb, inst_mel, midi, cuando(o) + humano(.006), corchea * d * .95, vol_mel * (1 + humano(.08)), cinta)
     # ── mezcla ──
     sal.volcar(bus, melb, resto, bat, padb)
-    if p.get("_debug") is not None:   # niveles por capa, para calibrar las muestras frente a los sintes
+    if p.get("_debug") is not None:   # niveles por capa (calibración)
         p["_debug"][S["nombre"]] = {k: round(20 * float(np.log10(np.sqrt(np.mean(v ** 2)) + 1e-9)), 1)
                                     for k, v in (("acordes", bus), ("melodia", melb), ("resto", resto), ("bateria", bat), ("pad", padb))}
     pump = np.ones(total)
@@ -1011,12 +990,11 @@ def render_pieza(p, seed, fondo=0.0, progreso=None):
     return audio / (np.max(np.abs(audio)) + 1e-9) * .92
 
 
-def generate_pieza(seed, outdir, estilo="aleatorio", variedad="medio", perfil=None, fondo=0.0, prev=None, muestras_=True):
+def generate_pieza(seed, outdir, estilo="aleatorio", variedad="medio", perfil=None, fondo=0.0, prev=None):
     """Compone y renderiza una pieza entera a WAV; devuelve (ruta, pieza)."""
     from pathlib import Path
     from scipy.io import wavfile
     p = componer(seed, estilo, None, variedad, 0, 2, prev, False, perfil)
-    p["muestras"] = bool(muestras_)
     audio = render_pieza(p, seed, fondo)
     out = Path(outdir) / f"pieza_{seed:06d}.wav"
     wavfile.write(str(out), SR, (audio * 32767).astype(np.int16))
@@ -1040,11 +1018,10 @@ def _cli():
         return
     outdir = args[1] if len(args) > 1 else "."
     variedad = args[args.index("--variedad") + 1] if "--variedad" in args else "medio"
-    sintes = "--sintes" in args
     prev = None
     for k, (seed, perfil) in enumerate(piezas_de_prueba(variedad)):
         t0 = time.time()
-        out, p = generate_pieza(seed, outdir, "aleatorio", variedad, perfil, 0.0, prev, not sintes)
+        out, p = generate_pieza(seed, outdir, "aleatorio", variedad, perfil, 0.0, prev)
         prev = p
         print(f"{k + 1}/3 {out.name}: {p['perfil_nombre']} · {p['tono']} · {p['bpm']} bpm · {p['inst']}+{p['instMel']}"
               f"{' (+' + p['capa'] + ')' if p['capa'] else ''} · {p['bat']} · {p['forma']} · {p['dur'] / 60:.1f} min "

@@ -115,19 +115,14 @@ def _render_worker(req, res):
     import traceback
     import numpy as np
     import piezas
-    import remezcla
     comp = piezas.Compositor(str(D / "memoria.json"))
-    rmx = remezcla.Remezcla(str(D), str(D / "remezcla.json"))
     while True:
         item = req.get()
         if item is None:
             return
         rid, _prev, estilo, bpm, fondo, opc, seed = item
         try:
-            if opc.get("fuente") == "remezcla":   # los MP3 de la biblioteca, cortados y encadenados al azar
-                info, cuerpo, cola = rmx.tramo(opc, seed)
-            else:
-                info, cuerpo, cola = comp.tramo(estilo, bpm, fondo, opc, seed)
+            info, cuerpo, cola = comp.tramo(estilo, bpm, fondo, opc, seed)
             res.put((rid, info, cuerpo.astype(np.float32), cola.astype(np.float32)))
         except Exception as e:   # un tramo fallido no tumba la radio: se pide otro
             print(f"radio infinita: error al componer: {e}\n{traceback.format_exc()}", file=sys.stderr)
@@ -247,8 +242,7 @@ def tocar_infinita(cfg):
             melodia = nivel
         else:
             azar["mel"] = (None, 0)
-        return {"quitar": quitar, "anadir": anadir, "melodia": melodia, "variedad": str(c.get("variedad") or "medio"),
-                "fuente": str(c.get("fuente") or "compositor"), "muestras": bool(c.get("muestras", True))}
+        return {"quitar": quitar, "anadir": anadir, "melodia": melodia, "variedad": str(c.get("variedad") or "medio")}
     radio.pedir(estilo, bpm, fondo(cfg), inst(cfg))
     paso = SR // 10                                    # 0,1 s por escritura
     fon, ins = fondo(cfg), inst(cfg)
@@ -313,7 +307,7 @@ def tocar_infinita(cfg):
                     e2, desde = _elegir_estilo(cfg, estilo, desde, False)
                     b2, f2, i2 = int(cfg.get("bpm") or 0), fondo(cfg), inst(cfg)
                     salto = SALTAR.exists()
-                    fuerte = lambda d: {k: v for k, v in d.items() if k not in ("melodia", "variedad", "muestras")}
+                    fuerte = lambda d: {k: v for k, v in d.items() if k not in ("melodia", "variedad")}
                     if (e2, b2, f2, fuerte(i2)) != (estilo, bpm, fon, fuerte(ins)) or salto:
                         SALTAR.unlink(missing_ok=True)
                         estilo, bpm, fon, ins = e2, b2, f2, i2

@@ -14,7 +14,8 @@ Toda la interfaz está en español.
   blues lento y aleatorio). Cada canción es distinta y se guarda como MP3 con su título.
 - **Videos de escena**: ciudad de noche, amanecer, día, atardecer, lluvia, nieve o aurora, en bucle
   perfecto de 20 segundos. También puedes subir tus propios MP4, imágenes fijas (se convierten en un video de 10 s
-  en bucle) o importar música de Pixabay.
+  en bucle) o importar música de Pixabay; cada canción importada guarda el enlace a su página original, por si
+  hace falta demostrar la licencia ante una reclamación de Content ID.
 - **Cola de video**: elige qué videos se emiten, cuántas horas cada uno y en qué orden. Se puede
   cambiar en caliente sin cortar el directo. Cada video puede llevar una **neblina** animada por encima,
   pensada para que las imágenes fijas parezcan moverse.
@@ -22,14 +23,11 @@ Toda la interfaz está en español.
   previa, y un vigilante relanza la emisión si el codificador se cae. Modo *local* para probar sin clave
   y modo *directo* para YouTube.
 - **Vista previa**: reproductor del directo dentro del panel y acceso por RTSP para VLC.
-- **Radio infinita**: música lofi compuesta en tiempo real, sin fin y sin repetirse, tocada con instrumentos
-  de muestras reales (piano, rhodes, bajo, batería…) o con sintetizadores: piezas de 3 a 6 minutos
+- **Radio infinita**: música lofi compuesta en tiempo real, sin fin y sin repetirse: piezas de 3 a 6 minutos
   con identidad propia (perfil, tonalidad, tempo, instrumentos), estructura (intro, secciones, descanso, cierre),
   melodías con pregunta y respuesta y una memoria que evita repetir combinaciones recientes. Elige el estilo, el
   tempo, los instrumentos y la variedad (baja, media, alta) mientras suena; los cambios entran en el siguiente compás.
-  Un modo de prueba compone tres piezas contrastadas en la biblioteca para compararlas. Como alternativa, la
-  **remezcla** toma tus propios MP3 de la biblioteca (por ejemplo los importados de Pixabay), los corta en frases y
-  los encadena sin fin, siguiendo, saltando y cambiando de canción al azar con fundidos.
+  Un modo de prueba compone tres piezas contrastadas en la biblioteca para compararlas.
 - **Video infinito**: lluvia de letras tipo Matrix generada en tiempo real, con velocidad y color
   ajustables mientras se emite, como alternativa a la cola de videos.
 - **Stats**: uso de CPU, memoria, red y disco del contenedor y del servidor, estado de la gráfica y

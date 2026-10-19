@@ -23,10 +23,9 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 
 import escenas
 import lofigen
-import muestras
 import piezas
 
-VERSION = "3.1"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
+VERSION = "3.2"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
 BASE = Path(__file__).parent
 TRACKS_DIR = BASE / "data" / "tracks"
 VIDEOS_DIR = BASE / "data" / "videos"    # biblioteca de videos + cola
@@ -157,13 +156,16 @@ def _cacheado(p, calcular):
 
 def _probe_track(p):
     out = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
-                          "format=duration:format_tags=title,album", "-of", "json", str(p)],
+                          "format=duration:format_tags=title,album,comment", "-of", "json", str(p)],
                          capture_output=True, text=True, timeout=10)
     fmt = json.loads(out.stdout)["format"]
     tags = {k.lower(): v for k, v in fmt.get("tags", {}).items()}
+    comentario = (tags.get("comment") or "").strip()
     return {"dur": float(fmt.get("duration", 0)),
             "title": tags.get("title") or p.name[:-4].replace("-", " ").capitalize(),
-            "tema": (tags.get("album") or "").replace("Tema ", "")}
+            "tema": (tags.get("album") or "").replace("Tema ", ""),
+            # página original (Pixabay) guardada en el comentario del MP3: por si hay que reclamar en Content ID
+            "url": comentario if comentario.startswith("https://pixabay.com/") else ""}
 
 
 def track_meta(p):
@@ -219,8 +221,7 @@ def gen_job(count, estilo="aleatorio", fondo=1.0, prueba=None):
             try:
                 if lote:
                     seed, perfil = lote[i]
-                    wav, tema = piezas.generate_pieza(seed, TRACKS_DIR, estilo, prueba, perfil, fondo, anterior,
-                                                      estado_infinita().get("muestras", True))
+                    wav, tema = piezas.generate_pieza(seed, TRACKS_DIR, estilo, prueba, perfil, fondo, anterior)
                     anterior = tema
                     etiqueta = (f"{tema['perfil_nombre']} · {tema['tono']} · {tema['bpm']} bpm · {tema['inst']} + {tema['instMel']}"
                                 f" · {tema['bat']} · {tema['forma']} · variedad {prueba}")
@@ -399,9 +400,11 @@ def audio_job(src, nombre, etiquetas):
             codec = ["-c:a", "copy"]
         else:
             codec = ["-ac", "2", "-ar", "44100", "-b:a", "320k"]
+        pagina = etiquetas.get("_pagina") or ""
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-map", "0:a:0", "-vn", *codec,
                         "-map_metadata", "-1", "-id3v2_version", "3", "-metadata", f"title={titulo}",
                         "-metadata", f"album=Tema {etiquetas.get('artist') or 'subida'}",
+                        *(["-metadata", f"comment={pagina}"] if pagina else []),
                         "-f", "mp3", str(parcial)], check=True, capture_output=True, text=True)
         parcial.replace(mp3)   # aparece en la lista solo cuando está completo
     except subprocess.CalledProcessError as e:
@@ -427,7 +430,7 @@ def titulo_generico(t):
     return not t or len(t) > 60 or t.count(",") > 1 or bool(_GENERICO.search(t))
 
 
-def _repartir(tmp, nombre, titulo="", artista=""):
+def _repartir(tmp, nombre, titulo="", artista="", pagina=""):
     """Analiza el archivo recibido y lo manda a Música o a Videos.
     Un MP3 con carátula trae una «imagen adjunta», no un video: va a Música."""
     try:
@@ -461,6 +464,8 @@ def _repartir(tmp, nombre, titulo="", artista=""):
             etiquetas["artist"] = artista
             if etiquetas.get("title"):      # como lo quiere el usuario: «Tokyo Lofi - ZephiraMusic»
                 etiquetas["title"] = f"{etiquetas['title']} - {artista}"
+        if pagina:
+            etiquetas["_pagina"] = pagina   # página original en Pixabay (va al comentario del MP3)
         threading.Thread(target=audio_job, args=(tmp, nombre, etiquetas), daemon=True).start()
         return "musica"
     tmp.unlink(missing_ok=True)
@@ -506,6 +511,10 @@ def api_importar():
     url = str(datos.get("url", "")).strip()
     titulo = " ".join(str(datos.get("titulo", "")).split())[:80]   # los manda el marcador desde la página
     artista = " ".join(str(datos.get("artista", "")).split())[:60]
+    pagina = str(datos.get("pagina", "")).strip()[:300]           # la página de la canción en Pixabay
+    pg = urllib.parse.urlparse(pagina)
+    if not (pg.scheme == "https" and pg.hostname and pg.hostname.endswith("pixabay.com")):
+        pagina = ""
     u = urllib.parse.urlparse(url)
     if u.hostname and u.hostname.endswith("pixabay.com") and "/music/" in u.path:
         return jsonify(error="ese es el enlace de la página: Pixabay no deja leerla desde el servidor. "
@@ -531,7 +540,7 @@ def api_importar():
     # nombre: el de «?filename=…» si viene, si no el del archivo
     nombre = urllib.parse.parse_qs(u.query).get("filename", [Path(u.path).stem])[0]
     nombre = re.sub(r"[-_]\d{4,}$", "", Path(nombre).stem)   # quita el número final de Pixabay
-    tipo = _repartir(tmp, nombre, titulo, artista)
+    tipo = _repartir(tmp, nombre, titulo, artista, pagina)
     if not tipo:
         return jsonify(error="el enlace no contiene audio, video ni imagen válidos"), 400
     return jsonify(ok=True, tipo=tipo)
@@ -641,10 +650,9 @@ def api_aleatorio():
 # Radio infinita: música procedural compuesta en tiempo real en vez de la lista (audiofeeder.py).
 INFINITA_FILE = TRACKS_DIR / "infinita.json"
 INFINITA_DEF = {"activo": False, "estilos": ["aleatorio"], "rotar_min": 60, "bpm": 0, "textura": False,
-                "inst_quitar": [], "inst_anadir": [], "melodia": 1, "variedad": "medio", "fuente": "compositor", "muestras": True,
+                "inst_quitar": [], "inst_anadir": [], "melodia": 1, "variedad": "medio",
                 "inst_aleatorio": False, "melodia_aleatoria": False}   # bpm 0 = automático; melodia 0-3 (1 = de vez en cuando)
 ROTAR_MIN = (0, 15, 30, 60, 120, 240)   # 0 = mezclar los estilos marcados en vez de rotar
-FUENTES = ("compositor", "remezcla")      # remezcla: los MP3 de la biblioteca cortados en frases y encadenados al azar
 
 
 def estado_infinita(cfg=None):
@@ -662,9 +670,6 @@ def estado_infinita(cfg=None):
     d["melodia"] = int(d["melodia"]) if str(d.get("melodia")).isdigit() and 0 <= int(d["melodia"]) <= 3 else 1
     d["inst_aleatorio"], d["melodia_aleatoria"] = bool(d.get("inst_aleatorio")), bool(d.get("melodia_aleatoria"))
     d["variedad"] = d.get("variedad") if d.get("variedad") in piezas.VARIEDADES else "medio"   # cuánto se separan las piezas
-    d["fuente"] = d.get("fuente") if d.get("fuente") in FUENTES else "compositor"   # compositor de piezas o remezcla de los MP3
-    d["muestras"] = bool(d.get("muestras", True))   # instrumentos con muestras reales (banco de sonidos) en vez de sintetizadores
-    d["muestras_disponibles"] = muestras.disponible()
     d["inst_estilo"] = lofigen.instrumentos_de(d["estilos"])   # los que usarían los estilos marcados (informativo)
     d["instrumentos"] = lofigen.INST_NOMBRES
     return d
@@ -672,7 +677,7 @@ def estado_infinita(cfg=None):
 
 def aplicar_infinita(d):
     with _io_lock:
-        escribir_json(INFINITA_FILE, {k: v for k, v in d.items() if k not in ("inst_estilo", "instrumentos", "muestras_disponibles")})
+        escribir_json(INFINITA_FILE, {k: v for k, v in d.items() if k not in ("inst_estilo", "instrumentos")})
 
 
 aplicar_infinita(estado_infinita())   # al arrancar, según la configuración guardada
@@ -697,17 +702,13 @@ def api_infinita():
         d["rotar_min"] = int(data["rotar_min"])
     if "textura" in data:
         d["textura"] = bool(data["textura"])
-    for k in ("inst_aleatorio", "melodia_aleatoria", "muestras"):
+    for k in ("inst_aleatorio", "melodia_aleatoria"):
         if k in data:
             d[k] = bool(data[k])
     if "melodia" in data:
         if data["melodia"] not in (0, 1, 2, 3):
             return jsonify(error="nivel de melodía no válido"), 400
         d["melodia"] = int(data["melodia"])
-    if "fuente" in data:
-        if data["fuente"] not in FUENTES:
-            return jsonify(error="fuente no válida (compositor o remezcla)"), 400
-        d["fuente"] = str(data["fuente"])
     if "variedad" in data:
         if data["variedad"] not in piezas.VARIEDADES:
             return jsonify(error="variedad no válida (bajo, medio o alto)"), 400
@@ -726,7 +727,7 @@ def api_infinita():
         if bpm and not 50 <= bpm <= 110:
             return jsonify(error="el tempo va de 50 a 110 bpm (0 = automático)"), 400
         d["bpm"] = bpm
-    actualizar_config(infinita={k: v for k, v in d.items() if k not in ("inst_estilo", "instrumentos", "muestras_disponibles")})
+    actualizar_config(infinita={k: v for k, v in d.items() if k not in ("inst_estilo", "instrumentos")})
     aplicar_infinita(d)
     return jsonify(ok=True, infinita=estado_infinita())
 

@@ -474,6 +474,8 @@
   .vtitle { display: flex; align-items: center; gap: 4px; min-width: 0; }
   .vtitle b { min-width: 0; }
   .vedit { width: 24px; height: 24px; border-radius: 7px; flex: none; opacity: 0; }
+  .vlink { width: 24px; height: 24px; border-radius: 7px; flex: none; color: var(--ok); opacity: .75; display: inline-grid; place-items: center; }
+  .vlink:hover { opacity: 1; background: rgba(94,230,160,.12); } .vlink svg { width: 13px; height: 13px; }
   .vedit svg { width: 13px; height: 13px; }
   .vitem:hover .vedit { opacity: .8; } .vedit:hover { opacity: 1 !important; }
   .vrename { width: 100%; max-width: 420px; font: 600 14px var(--sans); color: var(--ink); background: rgba(0,0,0,.4);
@@ -819,7 +821,6 @@
         </div>
         <div class="infpanel" id="inf-panel" hidden>
           <div class="ih"><b>Radio infinita</b><span>la música se compone sola mientras suena. Marca uno o varios estilos (con varios, va rotando) y el tempo; los cambios entran en el siguiente compás</span><small id="inf-now"></small></div>
-          <div class="inf-rota" id="inf-fuente"><span title="De dónde sale la música de la radio infinita">Fuente</span><button class="chip" data-fuente="compositor" title="Piezas de 3 a 6 minutos compuestas en tiempo real por el motor">Compositor</button><button class="chip" data-fuente="remezcla" title="Tus MP3 de la biblioteca (por ejemplo los importados de Pixabay), cortados en frases de 4 compases y encadenados sin fin: la mayoría de las veces siguen en línea, a veces saltan a otra frase y de vez en cuando cambian de canción. La variedad controla cuánto salta">Remezcla de tus MP3</button><span id="inf-fuente-txt" style="color:var(--dim)"></span></div>
           <div class="escenas" id="inf-estilos"></div>
           <div class="inf-rota" id="inf-rota" hidden><span>Con varios estilos:</span><button class="chip" data-min="0" title="Un solo estilo que suma los marcados: instrumentos, ritmos y tempos de todos ellos">Mezclar</button><span style="color:var(--dim)">o cambiar cada</span><button class="chip" data-min="15">15 min</button><button class="chip" data-min="30">30 min</button><button class="chip" data-min="60">1 h</button><button class="chip" data-min="120">2 h</button><button class="chip" data-min="240">4 h</button><small id="inf-rota-txt"></small></div>
           <div class="inf-inst" id="inf-inst"><span title="Los del estilo van marcados; pulsa uno para quitarlo o para añadir otro. Entra en el siguiente tramo">Instrumentos</span><div class="chips" id="inf-inst-chips"><small id="inf-inst-nota" style="width:100%;order:100;font:11px var(--mono);color:var(--ok)"></small><button class="chip rnd" id="inf-inst-rnd" onclick="alternarAzar('inst_aleatorio')" aria-label="aleatorio" title="Sortea una combinación de 2 a 4 instrumentos (sin los que hayas quitado) y cambiará cada 30 minutos"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button></div></div>
@@ -830,8 +831,7 @@
             <span class="lim">110</span>
             <span class="bpm" id="inf-bpm-v">auto</span>
             <button class="btn sm" id="inf-auto" onclick="tempoAuto()" title="Automático: el tempo deriva poco a poco dentro del rango del estilo">Auto</button>
-            <button class="btn sm" id="inf-real" onclick="alternarMuestras()" style="margin-left:auto" title="Instrumentos reales: las notas las toca un banco de sonidos con grabaciones (piano, rhodes, bajo, batería…) en vez de los sintetizadores. Activado por defecto; púlsalo para comparar">Instrumentos reales</button>
-            <button class="btn sm" id="inf-tex" onclick="alternarTextura()" title="Textura de fondo (vinilo, lluvia o cinta), muy baja. Apagada por defecto">Vinilo de fondo</button>
+            <button class="btn sm" id="inf-tex" onclick="alternarTextura()" style="margin-left:auto" title="Textura de fondo (vinilo, lluvia o cinta), muy baja. Apagada por defecto">Vinilo de fondo</button>
           </div>
         </div>
         <div class="thead"><span></span><span>#</span><span>título</span><span style="text-align:center; position:relative; left:-50px">tema</span><span style="text-align:right">dur.</span><span></span></div>
@@ -1329,7 +1329,7 @@ async function refresh() {
       <div class="track${t.name === enDirecto ? " endirecto" : ""}" data-name="${esc(t.name)}" data-search="${esc((t.title + " " + t.tema + " " + t.name).toLowerCase())}"
            style="--h:${hue(t.name)}; animation-delay:${Math.min(i, 15) * 25}ms">
         <span class="grip" title="arrastra para cambiar el orden"><svg viewBox="0 0 10 16" fill="currentColor"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg></span><div class="idx"><span class="n">${i + 1}</span><span class="pp">${ICON_PLAY}</span><span class="eq"><i></i><i></i><i></i></span></div>
-        <div style="min-width:0"><div class="ttl"><div class="ttitle" title="doble clic para cambiar el nombre">${esc(t.title)}</div>${t.name === enDirecto ? '<span class="ldot">EN DIRECTO</span>' : ""}<button class="iconbtn vedit" data-act="renombrar" title="cambiar el nombre">${ICON_EDIT}</button></div><div class="tsub">${t.name === enDirecto ? "sonando en el directo" : esc(t.name)}</div></div>
+        <div style="min-width:0"><div class="ttl"><div class="ttitle" title="doble clic para cambiar el nombre">${esc(t.title)}</div>${t.name === enDirecto ? '<span class="ldot">EN DIRECTO</span>' : ""}${t.url ? `<a class="iconbtn vlink" href="${esc(t.url)}" target="_blank" rel="noopener" title="abrir la página original en Pixabay (licencia y enlace por si hay que reclamar en Content ID)" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg></a>` : ""}<button class="iconbtn vedit" data-act="renombrar" title="cambiar el nombre">${ICON_EDIT}</button></div><div class="tsub">${t.name === enDirecto ? "sonando en el directo" : esc(t.name)}</div></div>
         <div class="ttema">${esc(t.tema || "—")}</div>
         <div class="tdur">${fmt(t.dur)}</div>
         <button class="iconbtn tdel" title="borrar">${ICON_DEL}</button>
@@ -1556,7 +1556,7 @@ function marcadorPixabay(o) {
   // último recurso: nombre del archivo (?filename=tokyo-lofi-573883.mp3)
   if (generico(t)) { const f = (m.match(/[?&]filename=([^&]+)/) || [])[1]; if (f) t = limpio(decodeURIComponent(f).replace(/\.mp3$/i, "").replace(/-\d+$/, "").replace(/[-_]+/g, " ")).replace(/\b\p{L}/gu, c => c.toUpperCase()); }
   if (generico(t)) t = "";
-  window.open(o + "/#importar=" + encodeURIComponent(m) + "&titulo=" + encodeURIComponent(t) + "&artista=" + encodeURIComponent(art), "radiolofi");
+  window.open(o + "/#importar=" + encodeURIComponent(m) + "&titulo=" + encodeURIComponent(t) + "&artista=" + encodeURIComponent(art) + "&pagina=" + encodeURIComponent(location.href.split("#")[0]), "radiolofi");
 }
 const MARCADOR = "(" + marcadorPixabay.toString() + ")(" + JSON.stringify(location.origin) + ")";
 $("px-mark").href = "javascript:" + encodeURIComponent(MARCADOR);
@@ -1566,7 +1566,7 @@ async function importarDesdeMarcador() {
   const p = new URLSearchParams(location.hash.slice(1));
   history.replaceState(null, "", location.pathname);
   try {
-    await post("/api/importar", {url: p.get("importar"), titulo: p.get("titulo") || "", artista: p.get("artista") || ""});
+    await post("/api/importar", {url: p.get("importar"), titulo: p.get("titulo") || "", artista: p.get("artista") || "", pagina: p.get("pagina") || ""});
     verTab("musica"); videoRunningPrev = true; knownTracks = "";
     toast(`Importando «${p.get("titulo") || "canción"}» desde Pixabay…`);
   } catch (e) { toast(e.message, true); }
@@ -1868,13 +1868,7 @@ function tickCola() {
   $("m-skip").disabled = !s.stream.running;
   if (mu.infinita) {
     const i = mu.infinita, pas = Date.now() / 1000 - mu.inicio, dur = mu.dur || 0, pz = i.pieza;
-    if (pz && pz.remezcla) {   // remezcla de los MP3 de la biblioteca (2.9)
-      const pos = Math.min(pz.antes + pas, pz.dur), sig = {sigue: "sigue en línea", salta: "saltará a otra frase", cambia: "cambiará de canción"}[pz.siguiente] || "";
-      $("m-live-t").textContent = `Radio infinita · Remezcla · ${pz.perfil_nombre} · ${i.bpm} bpm`;
-      $("m-live-r").textContent = `canción ${pz.n} · ${pz.seccion} · ${fmt(pos)} / ${fmt(pz.dur)} · después ${sig}`;
-      $("m-live-bar").style.width = pz.dur ? Math.min(100, pos / pz.dur * 100) + "%" : "0";
-      $("inf-now").textContent = `${pz.tono} · variedad ${pz.variedad}`;
-    } else if (pz) {   // compositor de piezas (2.8): pieza, sección y posición dentro de la pieza
+    if (pz) {   // compositor de piezas (2.8): pieza, sección y posición dentro de la pieza
       const pos = Math.min(pz.antes + pas, pz.dur);
       $("m-live-t").textContent = `Radio infinita · ${i.estilo_nombre} · ${pz.perfil_nombre} · ${pz.tono} · ${i.bpm} bpm`;
       $("m-live-r").textContent = i.solo ? `pieza ${pz.n} · ${pz.seccion} (${pz.idx}/${pz.total}) · ${fmt(pos)} / ${fmt(pz.dur)} · solo melodía (${i.instMel})`
@@ -2088,21 +2082,15 @@ function pintarInfinita(d, estilos) {
   if (!$("inf-estilos").childElementCount && estilos)
     $("inf-estilos").innerHTML = Object.entries(estilos).map(([k, e]) =>
       `<button class="escena" data-estilo="${esc(k)}" title="${esc(e.desc)}"><span class="em">${ICONO_ESTILO[k] || ICONO_ESTILO.jazz}</span><span class="en">${esc(e.nombre)}</span></button>`).join("");
-  const sel = new Set(d.estilos || []), remezcla = d.fuente === "remezcla";
-  document.querySelectorAll("#inf-fuente .chip[data-fuente]").forEach(c => c.classList.toggle("on", c.dataset.fuente === (d.fuente || "compositor")));
-  $("inf-fuente-txt").textContent = remezcla ? "suenan los MP3 de la biblioteca, cortados y encadenados al azar; los estilos, instrumentos, melodía y tempo no aplican" : "";
-  for (const id of ["inf-estilos", "inf-inst", "inf-tempo"]) { const el = $(id); if (el) el.hidden = remezcla; }
-  document.querySelectorAll("#inf-mel > span:first-child, #inf-mel .chip[data-mel], #inf-mel-rnd").forEach(el => el.hidden = remezcla);   // la variedad sí aplica a la remezcla
+  const sel = new Set(d.estilos || []);
   document.querySelectorAll("#inf-estilos .escena").forEach(x => x.classList.toggle("on", sel.has(x.dataset.estilo)));
-  $("inf-rota").hidden = sel.size < 2 || remezcla;
+  $("inf-rota").hidden = sel.size < 2;
   document.querySelectorAll("#inf-rota .chip").forEach(c => c.classList.toggle("on", +c.dataset.min === d.rotar_min));
   const i = ultimoEstado?.musica?.infinita, nom = k => estilosMusica[k]?.nombre || k;
   $("inf-rota-txt").textContent = sel.size > 1 && d.rotar_min === 0 ? `mezcla: ${d.estilos.map(nom).join(" + ")}`
     : i?.rota_en && sel.size > 1 ? `ahora ${nom(i.estilo)} · luego ${nom(i.siguiente || sig(d.estilos, i.estilo))} en ${Math.max(0, Math.ceil((i.rota_en - Date.now() / 1000) / 60))} min` : "";
   $("inf-auto").classList.toggle("on", !d.bpm);
   $("inf-tex").classList.toggle("on", !!d.textura);
-  $("inf-real").classList.toggle("on", !!d.muestras && d.muestras_disponibles !== false);
-  $("inf-real").disabled = d.muestras_disponibles === false;
   const minutos = h => h ? `cambiará en ${Math.max(0, Math.ceil((h - Date.now() / 1000) / 60))} min` : "cambiará cada 30 minutos";
   const nivelMel = d.melodia_aleatoria ? (i?.azar_mel ?? null) : (d.melodia ?? 1);
   document.querySelectorAll("#inf-mel .chip[data-mel]").forEach(c => c.classList.toggle("on", +c.dataset.mel === nivelMel));
@@ -2170,10 +2158,6 @@ $("inf-mel").addEventListener("click", e => {
   const c = e.target.closest(".chip[data-mel]"); if (!c) return;
   ajustarInfinita({melodia: +c.dataset.mel, melodia_aleatoria: false}, `Melodía: ${c.textContent} (entra en el siguiente tramo)`);
 });
-$("inf-fuente").addEventListener("click", e => {
-  const c = e.target.closest(".chip[data-fuente]"); if (!c) return;
-  ajustarInfinita({fuente: c.dataset.fuente}, c.dataset.fuente === "remezcla" ? "Remezcla de tus MP3: entra en el siguiente compás" : "Compositor: entra en el siguiente compás");
-});
 $("inf-var").addEventListener("click", e => {
   const c = e.target.closest(".chip[data-var]"); if (!c) return;
   ajustarInfinita({variedad: c.dataset.var}, `Variedad ${c.textContent}: se aplica a la siguiente pieza`);
@@ -2185,7 +2169,6 @@ $("inf-rota").addEventListener("click", e => {
 function pintarTempo() { const r = $("inf-bpm"); r.style.setProperty("--p", `${(r.value - r.min) / (r.max - r.min) * 100}%`); }
 $("inf-bpm").addEventListener("input", e => { infArrastrando = true; $("inf-bpm-v").textContent = `${e.target.value} bpm`; pintarTempo(); });
 $("inf-bpm").addEventListener("change", e => { infArrastrando = false; ajustarInfinita({bpm: +e.target.value}, `Tempo fijo a ${e.target.value} bpm`); });
-function alternarMuestras() { const on = !infinita?.muestras; ajustarInfinita({muestras: on}, on ? "Instrumentos reales: entran en la siguiente sección" : "Sintetizadores: entran en la siguiente sección"); }
 function alternarTextura() { const on = !infinita?.textura; ajustarInfinita({textura: on}, on ? "Textura de fondo activada (baja)" : "Textura de fondo quitada"); }
 function tempoAuto() {
   if (!infinita?.bpm) return ajustarInfinita({bpm: +$("inf-bpm").value}, `Tempo fijo a ${$("inf-bpm").value} bpm`);
