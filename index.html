@@ -777,7 +777,7 @@
         <div class="infpanel" id="inf-panel" hidden>
           <div class="ih"><b>Radio infinita</b><span>la música se compone sola mientras suena. Marca uno o varios estilos (con varios, va rotando) y el tempo; los cambios entran en el siguiente compás</span><small id="inf-now"></small></div>
           <div class="escenas" id="inf-estilos"></div>
-          <div class="inf-rota" id="inf-rota" hidden><span>Cambia de estilo cada</span><button class="chip" data-min="15">15 min</button><button class="chip" data-min="30">30 min</button><button class="chip" data-min="60">1 h</button><button class="chip" data-min="120">2 h</button><button class="chip" data-min="240">4 h</button><small id="inf-rota-txt"></small></div>
+          <div class="inf-rota" id="inf-rota" hidden><span>Con varios estilos:</span><button class="chip" data-min="0" title="Un solo estilo que suma los marcados: instrumentos, ritmos y tempos de todos ellos">Mezclar</button><span style="color:var(--dim)">o cambiar cada</span><button class="chip" data-min="15">15 min</button><button class="chip" data-min="30">30 min</button><button class="chip" data-min="60">1 h</button><button class="chip" data-min="120">2 h</button><button class="chip" data-min="240">4 h</button><small id="inf-rota-txt"></small></div>
           <div class="inf-tempo">
             <span>Tempo</span><span class="lim">50</span>
             <input type="range" id="inf-bpm" min="50" max="110" step="1" value="76" aria-label="tempo en bpm">
@@ -1945,7 +1945,8 @@ function pintarInfinita(d, estilos) {
   $("inf-rota").hidden = sel.size < 2;
   document.querySelectorAll("#inf-rota .chip").forEach(c => c.classList.toggle("on", +c.dataset.min === d.rotar_min));
   const i = ultimoEstado?.musica?.infinita, nom = k => estilosMusica[k]?.nombre || k;
-  $("inf-rota-txt").textContent = i?.rota_en && sel.size > 1 ? `ahora ${nom(i.estilo)} · luego ${nom(i.siguiente || sig(d.estilos, i.estilo))} en ${Math.max(0, Math.ceil((i.rota_en - Date.now() / 1000) / 60))} min` : "";
+  $("inf-rota-txt").textContent = sel.size > 1 && d.rotar_min === 0 ? `mezcla: ${d.estilos.map(nom).join(" + ")}`
+    : i?.rota_en && sel.size > 1 ? `ahora ${nom(i.estilo)} · luego ${nom(i.siguiente || sig(d.estilos, i.estilo))} en ${Math.max(0, Math.ceil((i.rota_en - Date.now() / 1000) / 60))} min` : "";
   $("inf-auto").classList.toggle("on", !d.bpm);
   $("inf-tex").classList.toggle("on", !!d.textura);
   if (!infArrastrando) {
@@ -1977,7 +1978,7 @@ $("inf-estilos").addEventListener("click", e => {
 });
 $("inf-rota").addEventListener("click", e => {
   const c = e.target.closest(".chip"); if (!c) return;
-  ajustarInfinita({rotar_min: +c.dataset.min}, `El estilo cambiará cada ${c.textContent}`);
+  ajustarInfinita({rotar_min: +c.dataset.min}, +c.dataset.min ? `El estilo cambiará cada ${c.textContent}` : "Estilos mezclados en uno solo: entra en el siguiente compás");
 });
 function pintarTempo() { const r = $("inf-bpm"); r.style.setProperty("--p", `${(r.value - r.min) / (r.max - r.min) * 100}%`); }
 $("inf-bpm").addEventListener("input", e => { infArrastrando = true; $("inf-bpm-v").textContent = `${e.target.value} bpm`; pintarTempo(); });

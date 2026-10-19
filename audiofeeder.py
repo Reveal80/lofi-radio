@@ -184,6 +184,8 @@ def _elegir_estilo(cfg, actual, desde, rotar):
     """Estilo que toca según la selección (varios = rotación cada rotar_min minutos, en el orden
     de la lista). Si el actual ya no está marcado, pasa al primero. Devuelve (estilo, desde)."""
     estilos = [e for e in (cfg.get("estilos") or [cfg.get("estilo") or "aleatorio"]) if e]
+    if len(estilos) > 1 and not int(cfg.get("rotar_min") or 0):   # rotar_min 0 = mezclar los estilos
+        return "+".join(estilos), desde or time.time()
     if actual not in estilos:
         return estilos[0], time.time()
     if rotar and len(estilos) > 1 and time.time() - desde >= max(1, int(cfg.get("rotar_min") or 60)) * 60:
@@ -240,12 +242,14 @@ def tocar_infinita(cfg):
             radio.pedir(estilo_sig, bpm, fon)
             compas = int(4 * 60 / tema["bpm"] * SR)
             escribir_actual({"name": "radio-infinita", "inicio": time.time(), "dur": len(cuerpo) / SR,
-                             "infinita": {"n": radio.n, "estilo": estilo, "estilo_nombre": nombres.get(estilo, estilo),
+                             "infinita": {"n": radio.n, "estilo": estilo,
+                                          "estilo_nombre": " + ".join(nombres.get(x, x) for x in estilo.split("+")),
                                           "estilos": estilos, "bpm": tema["bpm"], "inst": tema.get("inst"),
                                           "instMel": tema.get("instMel"), "bat": tema.get("bat"), "modo": tema.get("modo"),
                                           "tex": tema.get("tex"), "cambios": tema.get("cambios", []),
                                           "siguiente": estilo_sig if estilo_sig != estilo else None,
-                                          "rota_en": (desde + rotar_min * 60) if len(estilos) > 1 else 0}})
+                                          "mezcla": "+" in estilo,
+                                          "rota_en": (desde + rotar_min * 60) if len(estilos) > 1 and "+" not in estilo else 0}})
             estilo, desde = estilo_sig, desde_sig
             pos, ultimo, corte_en, nuevo = 0, time.time(), None, None
             while pos < len(cuerpo):

@@ -85,15 +85,16 @@ INST = {
     "pad":    dict(onda="sawtooth", voces=3, filtro=950,
                    ataque=.5, caida=1.2, sostiene=.7),
     "pulso":  dict(onda="sawtooth", filtro=1800,
-                   ataque=.003, caida=.12, sostiene=.05, punteo=True),
-    "caja":   dict(armonicos=[(1, 1), (3, .2)], filtro=5000,
-                   ataque=.002, caida=.3, sostiene=.02, octava=12),
-    "chip":   dict(onda="square", filtro=5200,
-                   ataque=.002, caida=.07, sostiene=.5),
+                   ataque=.008, caida=.12, sostiene=.05, punteo=True),
+    # (suavizados el 2026-10-19: ataques más lentos y menos agudos, el usuario los oía como «golpes»)
+    "caja":   dict(armonicos=[(1, 1), (3, .12)], filtro=2800,
+                   ataque=.01, caida=.3, sostiene=.02),
+    "chip":   dict(onda="square", filtro=2600,
+                   ataque=.008, caida=.09, sostiene=.5),
     # nuevos timbres para que las canciones no suenen todas a «seno con filtro»
     "guitarra": dict(modo="cuerda", filtro=4200, ataque=.002, caida=1.4, sostiene=.25),
     "flauta":   dict(modo="flauta", filtro=3200, ataque=.07, caida=.4, sostiene=.7),
-    "campana":  dict(modo="fm", filtro=7000, ataque=.002, caida=1.6, sostiene=.04),
+    "campana":  dict(modo="fm", filtro=3800, ataque=.01, caida=1.6, sostiene=.04),
 }
 
 
@@ -144,7 +145,7 @@ def tocar_nota(buf, inst, m, t, dur, vol, cinta=False):
     if modo == "cuerda":
         out = _cuerda(f0, n)
     elif modo == "fm":     # campana: FM con índice que se apaga
-        out = np.sin(2 * np.pi * f0 * tt + 3 * np.exp(-tt / .45) * np.sin(2 * np.pi * f0 * 3.5 * tt))
+        out = np.sin(2 * np.pi * f0 * tt + 1.6 * np.exp(-tt / .45) * np.sin(2 * np.pi * f0 * 3.5 * tt))
     elif modo == "flauta":  # seno con vibrato tardío y algo de soplo
         vib = 1 + .006 * np.sin(2 * np.pi * 5 * tt) * (1 - np.exp(-tt / .3))
         fase = 2 * np.pi * np.cumsum(f0 * vib) / SR
@@ -360,9 +361,9 @@ def render_theme(T, cycles, seed, continuo=False, fondo=1.0):
                 if R["K"][i] == "x" and not sin_bombo:
                     bombo(bat, cuando(i), .34 if i == 0 else .26, kicks)
                 if R["S"][i] == "x":
-                    golpe(bat, cuando(i), .17, "bandpass", 1800 * _KIT["sn"], _KIT["sd"])
+                    golpe(bat, cuando(i), .13, "bandpass", 1500 * _KIT["sn"], _KIT["sd"])
                 elif R["S"][i] == "r":
-                    golpe(bat, cuando(i), .12, "bandpass", 3200 * _KIT["sn"], .05)
+                    golpe(bat, cuando(i), .08, "bandpass", 2600 * _KIT["sn"], .05)
                 if R["H"][i] == "x":
                     golpe(bat, cuando(i), .018 if i % 2 else .028, "highpass", 7500 * _KIT["hh"], .045)
                 elif R["H"][i] == "o":
@@ -370,11 +371,11 @@ def render_theme(T, cycles, seed, continuo=False, fondo=1.0):
                 if _KIT["shaker"]:   # maraca suave a semicorcheas
                     golpe(bat, cuando(i) + corchea / 2, .008, "highpass", 9000, .03)
             if c in (9, 13):   # redoble suave antes de cambiar
-                golpe(bat, cuando(7), .12, "bandpass", 1200, .3)
+                golpe(bat, cuando(7), .07, "bandpass", 1200, .3)
         # el gancho: en A tal cual, en B una octava arriba y no siempre entero
         if parte in ("A", "B") and T.get("mel"):
             frase = T["mel"][(c - 2) % len(T["mel"])]
-            sube = 12 if parte == "B" else 0
+            sube = 12 if parte == "B" and T.get("subeB", True) else 0
             for k, m in enumerate(frase):
                 if not m or (parte == "B" and _RNG.random() < .2):
                     continue
@@ -529,10 +530,36 @@ ESTILOS = {
 }
 
 
+def estilo_de(nombre):
+    """Estilo por nombre; «chill+jazz» es la mezcla de varios: se suman sus listas de
+    instrumentos, baterías…, y los rangos (tempo, swing, sala) y probabilidades se promedian."""
+    partes = [x for x in str(nombre or "").split("+") if x in ESTILOS]
+    if len(partes) <= 1:
+        return ESTILOS.get(partes[0] if partes else nombre, ESTILOS["aleatorio"])
+    Es = [ESTILOS[x] for x in partes]
+    M = {"nombre": " + ".join(E["nombre"] for E in Es), "desc": "mezcla"}
+    for k in ("inst", "instMel", "bat", "bajo", "tex", "comp", "densidad"):
+        listas = [E[k] for E in Es if k in E]
+        if len(listas) == len(Es):   # si alguno no acota (aleatorio), la mezcla tampoco
+            M[k] = sum(listas, [])
+    for k in ("bpm", "sw", "sala"):
+        rangos = [E[k] for E in Es if k in E]
+        if rangos:
+            M[k] = (sum(r[0] for r in rangos) / len(rangos), sum(r[1] for r in rangos) / len(rangos))
+    for k in ("menor", "novena", "guino", "partB", "break", "intro"):
+        vals = [E[k] for E in Es if k in E]
+        if vals:
+            M[k] = sum(vals) / len(vals)
+    progs = [E["progs"] for E in Es if "progs" in E]
+    if progs:
+        M["progs"] = sorted(set(sum(progs, [])))
+    return M
+
+
 def tema_aleatorio(seed, estilo="aleatorio"):
     """Compone un tema nuevo con las reglas del motor de referencia,
-    acotado por el estilo elegido."""
-    E = ESTILOS.get(estilo, ESTILOS["aleatorio"])
+    acotado por el estilo elegido (o mezcla «a+b»)."""
+    E = estilo_de(estilo)
     rng = np.random.default_rng(seed)
     elige = lambda clave: str(rng.choice(E.get(clave, TODOS[clave])))
     menor = rng.random() < E.get("menor", .45)
@@ -548,7 +575,7 @@ def tema_aleatorio(seed, estilo="aleatorio"):
     bpm_min, bpm_max = E.get("bpm", (60, 92))
     sw_min, sw_max = E.get("sw", (.06, .2))
     tema = dict(
-        bpm=int(rng.integers(bpm_min, bpm_max + 1)),
+        bpm=int(rng.integers(int(bpm_min), int(bpm_max) + 1)),
         sw=round(float(rng.uniform(sw_min, sw_max)), 2),
         inst=elige("inst"), instMel=elige("instMel"), bat=elige("bat"),
         bajo=elige("bajo"), tex=elige("tex"), comp=elige("comp"),
@@ -598,7 +625,7 @@ def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None):
     uno o dos grupos de parámetros. Si el estilo pedido no admite algo del tramo anterior
     (instrumento, batería…), lo va acercando al estilo de dos en dos cosas por tramo, así el
     cambio de estilo se nota poco a poco. bpm fijo si se da; si no, deriva dentro del estilo."""
-    E = ESTILOS.get(estilo, ESTILOS["aleatorio"])
+    E = estilo_de(estilo)
     rng = np.random.default_rng(seed)
     nuevo = tema_aleatorio(int(rng.integers(1 << 30)), estilo)
     if prev is None:
@@ -635,10 +662,18 @@ def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None):
             T["sw"] = nuevo["sw"]
         T["bpm"] = prev["bpm"]
     T.pop("guino", None)   # sin guiños de 8 bits en la radio infinita (al usuario le sonaban a videojuego)
+    # más armónico: la melodía no sube de dos octavas y una cuarta sobre la raíz, la parte B no
+    # salta una octava, y fuera del retro no hay timbres percusivos en la melodía
+    techo = T["raiz"] + 29
+    T["mel"] = [[(m - 12 if m and m > techo else m) for m in fr] for fr in T["mel"]]
+    T["subeB"] = False
+    suave = {"caja": "vibra", "chip": "pulso"}
+    if T["instMel"] in suave and "chip" not in E.get("instMel", []):
+        T["instMel"] = suave[T["instMel"]]
     if bpm:
         T["bpm"] = int(bpm)
     elif prev is not None:   # deriva: hacia el rango del estilo, como mucho 4 bpm por tramo
-        lo, hi = E.get("bpm", (60, 92))
+        lo, hi = (int(x) for x in E.get("bpm", (60, 92)))
         objetivo = min(max(T["bpm"], lo), hi)
         if objetivo != T["bpm"]:
             T["bpm"] += max(-4, min(4, objetivo - T["bpm"]))

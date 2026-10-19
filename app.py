@@ -619,7 +619,7 @@ def api_aleatorio():
 # Radio infinita: música procedural compuesta en tiempo real en vez de la lista (audiofeeder.py).
 INFINITA_FILE = TRACKS_DIR / "infinita.json"
 INFINITA_DEF = {"activo": False, "estilos": ["aleatorio"], "rotar_min": 60, "bpm": 0, "textura": False}   # bpm 0 = automático
-ROTAR_MIN = (15, 30, 60, 120, 240)
+ROTAR_MIN = (0, 15, 30, 60, 120, 240)   # 0 = mezclar los estilos marcados en vez de rotar
 
 
 def estado_infinita(cfg=None):
@@ -646,7 +646,7 @@ aplicar_infinita(estado_infinita())   # al arrancar, según la configuración gu
 @app.post("/api/infinita")
 def api_infinita():
     """Ajustes de la radio infinita: activo, estilos (lista; varios = rotan cada rotar_min
-    minutos en ese orden), rotar_min (15/30/60/120/240) y bpm (50-110, 0 = automático)."""
+    minutos en ese orden; 0 = mezclarlos en un solo estilo), rotar_min y bpm (50-110, 0 = automático)."""
     data = request.get_json(force=True) or {}
     d = estado_infinita()
     if "activo" in data:
