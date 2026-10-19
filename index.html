@@ -806,7 +806,8 @@
             <span class="lim">110</span>
             <span class="bpm" id="inf-bpm-v">auto</span>
             <button class="btn sm" id="inf-auto" onclick="tempoAuto()" title="Automático: el tempo deriva poco a poco dentro del rango del estilo">Auto</button>
-            <button class="btn sm" id="inf-tex" onclick="alternarTextura()" style="margin-left:auto" title="Textura de fondo (vinilo, lluvia o cinta), muy baja. Apagada por defecto">Vinilo de fondo</button>
+            <button class="btn sm" id="inf-real" onclick="alternarMuestras()" style="margin-left:auto" title="Instrumentos reales: las notas las toca un banco de sonidos con grabaciones (piano, rhodes, bajo, batería…) en vez de los sintetizadores. Activado por defecto; púlsalo para comparar">Instrumentos reales</button>
+            <button class="btn sm" id="inf-tex" onclick="alternarTextura()" title="Textura de fondo (vinilo, lluvia o cinta), muy baja. Apagada por defecto">Vinilo de fondo</button>
           </div>
         </div>
         <div class="thead"><span></span><span>#</span><span>título</span><span style="text-align:center; position:relative; left:-50px">tema</span><span style="text-align:right">dur.</span><span></span></div>
@@ -2076,6 +2077,8 @@ function pintarInfinita(d, estilos) {
     : i?.rota_en && sel.size > 1 ? `ahora ${nom(i.estilo)} · luego ${nom(i.siguiente || sig(d.estilos, i.estilo))} en ${Math.max(0, Math.ceil((i.rota_en - Date.now() / 1000) / 60))} min` : "";
   $("inf-auto").classList.toggle("on", !d.bpm);
   $("inf-tex").classList.toggle("on", !!d.textura);
+  $("inf-real").classList.toggle("on", !!d.muestras && d.muestras_disponibles !== false);
+  $("inf-real").disabled = d.muestras_disponibles === false;
   const minutos = h => h ? `cambiará en ${Math.max(0, Math.ceil((h - Date.now() / 1000) / 60))} min` : "cambiará cada 30 minutos";
   const nivelMel = d.melodia_aleatoria ? (i?.azar_mel ?? null) : (d.melodia ?? 1);
   document.querySelectorAll("#inf-mel .chip[data-mel]").forEach(c => c.classList.toggle("on", +c.dataset.mel === nivelMel));
@@ -2156,6 +2159,7 @@ $("inf-rota").addEventListener("click", e => {
 function pintarTempo() { const r = $("inf-bpm"); r.style.setProperty("--p", `${(r.value - r.min) / (r.max - r.min) * 100}%`); }
 $("inf-bpm").addEventListener("input", e => { infArrastrando = true; $("inf-bpm-v").textContent = `${e.target.value} bpm`; pintarTempo(); });
 $("inf-bpm").addEventListener("change", e => { infArrastrando = false; ajustarInfinita({bpm: +e.target.value}, `Tempo fijo a ${e.target.value} bpm`); });
+function alternarMuestras() { const on = !infinita?.muestras; ajustarInfinita({muestras: on}, on ? "Instrumentos reales: entran en la siguiente sección" : "Sintetizadores: entran en la siguiente sección"); }
 function alternarTextura() { const on = !infinita?.textura; ajustarInfinita({textura: on}, on ? "Textura de fondo activada (baja)" : "Textura de fondo quitada"); }
 function tempoAuto() {
   if (!infinita?.bpm) return ajustarInfinita({bpm: +$("inf-bpm").value}, `Tempo fijo a ${$("inf-bpm").value} bpm`);

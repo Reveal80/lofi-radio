@@ -22,7 +22,8 @@ Toda la interfaz está en español.
   previa, y un vigilante relanza la emisión si el codificador se cae. Modo *local* para probar sin clave
   y modo *directo* para YouTube.
 - **Vista previa**: reproductor del directo dentro del panel y acceso por RTSP para VLC.
-- **Radio infinita**: música lofi compuesta en tiempo real, sin fin y sin repetirse: piezas de 3 a 6 minutos
+- **Radio infinita**: música lofi compuesta en tiempo real, sin fin y sin repetirse, tocada con instrumentos
+  de muestras reales (piano, rhodes, bajo, batería…) o con sintetizadores: piezas de 3 a 6 minutos
   con identidad propia (perfil, tonalidad, tempo, instrumentos), estructura (intro, secciones, descanso, cierre),
   melodías con pregunta y respuesta y una memoria que evita repetir combinaciones recientes. Elige el estilo, el
   tempo, los instrumentos y la variedad (baja, media, alta) mientras suena; los cambios entran en el siguiente compás.

@@ -4,14 +4,15 @@
 FROM python:3.12-slim
 
 # fonts-vlgothic: katakana de media anchura para el video infinito tipo Matrix (8 MB)
+# fluidsynth + fluid-soundfont-gm: instrumentos con muestras reales para el compositor (3.0; FluidR3, MIT, 145 MB)
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ffmpeg fonts-vlgothic \
+ && apt-get install -y --no-install-recommends ffmpeg fonts-vlgothic fluidsynth fluid-soundfont-gm \
  && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir flask==3.1.3 numpy==2.5.4 scipy==1.18.1
 
 WORKDIR /app
-COPY app.py audiofeeder.py videofeeder.py escenas.py lofigen.py piezas.py remezcla.py index.html ./
+COPY app.py audiofeeder.py videofeeder.py escenas.py lofigen.py piezas.py remezcla.py muestras.py index.html ./
 COPY vendor/ vendor/
 COPY apache/ apache/
 COPY docker-compose.imagen.yml docker-compose.yml

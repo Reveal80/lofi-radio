@@ -23,9 +23,10 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 
 import escenas
 import lofigen
+import muestras
 import piezas
 
-VERSION = "2.9"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
+VERSION = "3.0"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
 BASE = Path(__file__).parent
 TRACKS_DIR = BASE / "data" / "tracks"
 VIDEOS_DIR = BASE / "data" / "videos"    # biblioteca de videos + cola
@@ -218,7 +219,8 @@ def gen_job(count, estilo="aleatorio", fondo=1.0, prueba=None):
             try:
                 if lote:
                     seed, perfil = lote[i]
-                    wav, tema = piezas.generate_pieza(seed, TRACKS_DIR, estilo, prueba, perfil, fondo, anterior)
+                    wav, tema = piezas.generate_pieza(seed, TRACKS_DIR, estilo, prueba, perfil, fondo, anterior,
+                                                      estado_infinita().get("muestras", True))
                     anterior = tema
                     etiqueta = (f"{tema['perfil_nombre']} · {tema['tono']} · {tema['bpm']} bpm · {tema['inst']} + {tema['instMel']}"
                                 f" · {tema['bat']} · {tema['forma']} · variedad {prueba}")
@@ -639,7 +641,7 @@ def api_aleatorio():
 # Radio infinita: música procedural compuesta en tiempo real en vez de la lista (audiofeeder.py).
 INFINITA_FILE = TRACKS_DIR / "infinita.json"
 INFINITA_DEF = {"activo": False, "estilos": ["aleatorio"], "rotar_min": 60, "bpm": 0, "textura": False,
-                "inst_quitar": [], "inst_anadir": [], "melodia": 1, "variedad": "medio", "fuente": "compositor",
+                "inst_quitar": [], "inst_anadir": [], "melodia": 1, "variedad": "medio", "fuente": "compositor", "muestras": True,
                 "inst_aleatorio": False, "melodia_aleatoria": False}   # bpm 0 = automático; melodia 0-3 (1 = de vez en cuando)
 ROTAR_MIN = (0, 15, 30, 60, 120, 240)   # 0 = mezclar los estilos marcados en vez de rotar
 FUENTES = ("compositor", "remezcla")      # remezcla: los MP3 de la biblioteca cortados en frases y encadenados al azar
@@ -661,6 +663,8 @@ def estado_infinita(cfg=None):
     d["inst_aleatorio"], d["melodia_aleatoria"] = bool(d.get("inst_aleatorio")), bool(d.get("melodia_aleatoria"))
     d["variedad"] = d.get("variedad") if d.get("variedad") in piezas.VARIEDADES else "medio"   # cuánto se separan las piezas
     d["fuente"] = d.get("fuente") if d.get("fuente") in FUENTES else "compositor"   # compositor de piezas o remezcla de los MP3
+    d["muestras"] = bool(d.get("muestras", True))   # instrumentos con muestras reales (banco de sonidos) en vez de sintetizadores
+    d["muestras_disponibles"] = muestras.disponible()
     d["inst_estilo"] = lofigen.instrumentos_de(d["estilos"])   # los que usarían los estilos marcados (informativo)
     d["instrumentos"] = lofigen.INST_NOMBRES
     return d
@@ -668,7 +672,7 @@ def estado_infinita(cfg=None):
 
 def aplicar_infinita(d):
     with _io_lock:
-        escribir_json(INFINITA_FILE, {k: v for k, v in d.items() if k not in ("inst_estilo", "instrumentos")})
+        escribir_json(INFINITA_FILE, {k: v for k, v in d.items() if k not in ("inst_estilo", "instrumentos", "muestras_disponibles")})
 
 
 aplicar_infinita(estado_infinita())   # al arrancar, según la configuración guardada
@@ -693,7 +697,7 @@ def api_infinita():
         d["rotar_min"] = int(data["rotar_min"])
     if "textura" in data:
         d["textura"] = bool(data["textura"])
-    for k in ("inst_aleatorio", "melodia_aleatoria"):
+    for k in ("inst_aleatorio", "melodia_aleatoria", "muestras"):
         if k in data:
             d[k] = bool(data[k])
     if "melodia" in data:
@@ -722,7 +726,7 @@ def api_infinita():
         if bpm and not 50 <= bpm <= 110:
             return jsonify(error="el tempo va de 50 a 110 bpm (0 = automático)"), 400
         d["bpm"] = bpm
-    actualizar_config(infinita={k: v for k, v in d.items() if k not in ("inst_estilo", "instrumentos")})
+    actualizar_config(infinita={k: v for k, v in d.items() if k not in ("inst_estilo", "instrumentos", "muestras_disponibles")})
     aplicar_infinita(d)
     return jsonify(ok=True, infinita=estado_infinita())
 

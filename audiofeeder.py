@@ -248,7 +248,7 @@ def tocar_infinita(cfg):
         else:
             azar["mel"] = (None, 0)
         return {"quitar": quitar, "anadir": anadir, "melodia": melodia, "variedad": str(c.get("variedad") or "medio"),
-                "fuente": str(c.get("fuente") or "compositor")}
+                "fuente": str(c.get("fuente") or "compositor"), "muestras": bool(c.get("muestras", True))}
     radio.pedir(estilo, bpm, fondo(cfg), inst(cfg))
     paso = SR // 10                                    # 0,1 s por escritura
     fon, ins = fondo(cfg), inst(cfg)
@@ -313,7 +313,7 @@ def tocar_infinita(cfg):
                     e2, desde = _elegir_estilo(cfg, estilo, desde, False)
                     b2, f2, i2 = int(cfg.get("bpm") or 0), fondo(cfg), inst(cfg)
                     salto = SALTAR.exists()
-                    fuerte = lambda d: {k: v for k, v in d.items() if k not in ("melodia", "variedad")}
+                    fuerte = lambda d: {k: v for k, v in d.items() if k not in ("melodia", "variedad", "muestras")}
                     if (e2, b2, f2, fuerte(i2)) != (estilo, bpm, fon, fuerte(ins)) or salto:
                         SALTAR.unlink(missing_ok=True)
                         estilo, bpm, fon, ins = e2, b2, f2, i2
