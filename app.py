@@ -961,8 +961,10 @@ def _procesos():
         ticks = int(campos[11]) + int(campos[12])
         rss = int(campos[21]) * pagina
         args = [a.decode(errors="replace") for a in cmd if a]
-        if nombre in ("python", "python3", "bash", "sh") and len(args) > 1:
-            nombre = f"{nombre} {Path(args[1]).name}"   # app.py / videofeeder.py / audiofeeder.py
+        if nombre in ("python", "python3", "bash", "sh"):
+            script = next((a for a in args[1:] if not a.startswith("-")), None)   # salta -u, -c…
+            if script:
+                nombre = f"{nombre} {Path(script).name}"   # app.py / videofeeder.py / audiofeeder.py
         out[int(d.name)] = {"nombre": nombre, "ticks": ticks, "rss": rss}
     return out
 
