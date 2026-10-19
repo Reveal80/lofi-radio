@@ -12,6 +12,8 @@ Ficheros de control (en la carpeta de videos):
   actual.json  lo que está sonando ahora (lo escribe este proceso)
   saltar       si existe, pasa al siguiente video y lo borra
   aleatorio    si existe, el siguiente video se elige al azar (modo aleatorio del panel)
+  infinita.json  {"activo", "velocidad" 1-10, "color"}: video infinito tipo Matrix generado en
+               tiempo real con numpy (lluvia de glifos) en vez de la cola; se relee cada segundo.
 """
 import json
 import random
@@ -25,6 +27,7 @@ FRAME = W * H * 3 // 2
 D = Path(sys.argv[1])
 COLA, ACTUAL, SALTAR = D / "cola.json", D / "actual.json", D / "saltar"
 ALEATORIO = D / "aleatorio"
+INFINITA = D / "infinita.json"
 NEGRO = bytes([16]) * (W * H) + bytes([128]) * (W * H // 2)
 out = sys.stdout.buffer
 
@@ -41,6 +44,150 @@ def escribir_actual(datos):
     tmp = ACTUAL.with_suffix(".tmp")
     tmp.write_text(json.dumps(datos))
     tmp.replace(ACTUAL)
+
+
+def leer_infinita():
+    """Ajustes del video infinito si está activo; None si toca la cola."""
+    try:
+        d = json.loads(INFINITA.read_text())
+        return d if d.get("activo") else None
+    except Exception:
+        return None
+
+
+# ── video infinito: lluvia de letras tipo Matrix ──
+# Celdas de 16x24 px (120x45). Un atlas de glifos (DejaVu Sans Mono, dibujados por ffmpeg una
+# sola vez, más sus espejos) a 32 niveles de brillo + cabeza blanca, en Y, U y V. Cada fotograma
+# es una indexación numpy del atlas con la rejilla de (nivel, glifo): ~7 ms (22 % de un núcleo).
+CW, CH = 16, 24
+COLS, ROWS = W // CW, H // CH
+FUENTE = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
+GLIFOS = list("0123456789ABCDEFGHJKLMNPQRSTUVWXYZ+-*<>=:")
+NIVELES = 32
+COLORES = {   # RGB de la cabeza de color (la cola se apaga hacia negro)
+    "verde": (0, 255, 70), "azul": (40, 150, 255), "ambar": (255, 170, 30), "blanco": (225, 225, 225),
+    "rojo": (255, 55, 55), "morado": (175, 80, 255), "cian": (40, 230, 230),
+}
+
+
+def _glifos_np():
+    """Atlas (n, 24, 16) float 0..1: todos los glifos en una sola llamada a ffmpeg, más espejos."""
+    import numpy as np
+    n = len(GLIFOS)
+    esc = lambda c: c.replace("\\", "\\\\").replace(":", "\\:")   # «:» separa opciones del filtro
+    filtros = ",".join(f"drawtext=fontfile={FUENTE}:text='{esc(c)}':fontsize=21:fontcolor=white:"
+                       f"x={i * CW}+({CW}-tw)/2:y=({CH}-th)/2-1" for i, c in enumerate(GLIFOS))
+    r = subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", f"color=black:s={n * CW}x{CH}", "-vf", filtros,
+                        "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"], capture_output=True, timeout=60)
+    if len(r.stdout) != CH * n * CW:
+        raise RuntimeError("no se pudieron dibujar los glifos: " + r.stderr.decode(errors="replace")[-300:])
+    tira = np.frombuffer(r.stdout, dtype=np.uint8).reshape(CH, n * CW)
+    g = [tira[:, i * CW:(i + 1) * CW] for i in range(n)]
+    g += [x[:, ::-1] for x, c in zip(g, GLIFOS) if c.isalpha()]   # espejados, como en la película
+    return np.stack(g).astype(np.float32) / 255
+
+
+def _atlas(glifos, rgb):
+    """Atlas Y/U/V uint8 (niveles+1, n, alto, ancho) para un color (BT.601, rango limitado)."""
+    import numpy as np
+    r, g, b = rgb
+    yc, uc, vc = 16 + (65.481 * r + 128.553 * g + 24.966 * b) / 255, 128 + (-37.797 * r - 74.203 * g + 112 * b) / 255, \
+                 128 + (112 * r - 93.786 * g - 18.214 * b) / 255
+    n = len(glifos)
+    sub = glifos.reshape(n, CH // 2, 2, CW // 2, 2).mean(axis=(2, 4))
+    s = (np.arange(NIVELES) / (NIVELES - 1)) ** 1.7
+    Y = np.empty((NIVELES + 1, n, CH, CW), np.uint8)
+    U = np.empty((NIVELES + 1, n, CH // 2, CW // 2), np.uint8)
+    V = np.empty_like(U)
+    for l in range(NIVELES):
+        Y[l] = 16 + (yc - 16) * s[l] * glifos
+        U[l] = 128 + (uc - 128) * s[l] * sub
+        V[l] = 128 + (vc - 128) * s[l] * sub
+    Y[NIVELES] = 16 + 219 * glifos   # cabeza: blanca
+    U[NIVELES] = 128
+    V[NIVELES] = 128
+    return Y, U, V
+
+
+def tocar_matrix(cfg):
+    """Genera la lluvia de letras hasta que se desactive. Velocidad y color se releen cada segundo."""
+    import numpy as np
+    rng = np.random.default_rng()
+    glifos = _glifos_np()
+    ng = len(glifos)
+    color = cfg.get("color") if cfg.get("color") in COLORES else "verde"
+    Yat, Uat, Vat = _atlas(glifos, COLORES[color])
+    F = np.zeros((ROWS, COLS), np.float32)                 # brillo de cada celda (0..1)
+    G = rng.integers(0, ng, (ROWS, COLS))                  # glifo de cada celda
+    cabeza = np.zeros((ROWS, COLS), bool)
+    head = np.full(COLS, -1.0)                              # fila de la cabeza de cada columna (-1 = sin gota)
+    vel = np.zeros(COLS)
+    espera = rng.integers(0, 90, COLS).astype(float)
+
+    def ajustar(c):
+        v = min(max(float(c.get("velocidad") or 5), 1), 10)
+        cps = 3 + 2.7 * v                                   # celdas por segundo (3..30)
+        return v, cps, np.float32(.5 ** (cps / (6 * FPS)))  # la cola se apaga en ~6 celdas de recorrido
+
+    velocidad, cps, decay = ajustar(cfg)
+    escribir_actual({"id": "matrix", "video": "matrix", "inicio": time.time(), "horas": 0,
+                     "matrix": {"velocidad": velocidad, "color": color}})
+    mtime = None
+    t0 = time.time()
+    f = 0
+    while True:
+        F *= decay
+        cabeza[:] = False
+        espera -= 1
+        nuevo = (head < 0) & (espera <= 0)
+        head[nuevo] = 0
+        vel[nuevo] = cps / FPS * rng.uniform(.6, 1.4, int(nuevo.sum()))
+        activos = np.nonzero(head >= 0)[0]
+        prev = np.floor(head[activos]).astype(int)
+        head[activos] += vel[activos]
+        cur = np.floor(head[activos]).astype(int)
+        for c, a, b in zip(activos, prev, cur):
+            for r in range(max(a, 0), min(b, ROWS - 1) + 1):
+                if r != a or a == 0:
+                    F[r, c] = 1.0
+                    G[r, c] = rng.integers(ng)
+            if b < ROWS:
+                cabeza[b, c] = True
+            elif b > ROWS + 2:
+                head[c] = -1
+                espera[c] = rng.integers(10, 150)
+        m = rng.random((ROWS, COLS)) < .02                  # parpadeo: algunos glifos cambian
+        G[m] = rng.integers(0, ng, int(m.sum()))
+        L = np.minimum((F * (NIVELES - 1) + .5).astype(np.int64), NIVELES - 1)
+        L[cabeza] = NIVELES
+        Y = Yat[L, G].transpose(0, 2, 1, 3).reshape(H, W)
+        U = Uat[L, G].transpose(0, 2, 1, 3).reshape(H // 2, W // 2)
+        V = Vat[L, G].transpose(0, 2, 1, 3).reshape(H // 2, W // 2)
+        out.write(Y.tobytes() + U.tobytes() + V.tobytes())
+        f += 1
+        if f % FPS == 0:                                    # una vez por segundo: ¿cambios?
+            SALTAR.unlink(missing_ok=True)
+            try:
+                m2 = INFINITA.stat().st_mtime
+            except FileNotFoundError:
+                return
+            if m2 != mtime:
+                mtime = m2
+                c2 = leer_infinita()
+                if not c2:
+                    return
+                velocidad, cps, decay = ajustar(c2)
+                nuevo_color = c2.get("color") if c2.get("color") in COLORES else "verde"
+                if nuevo_color != color:
+                    color = nuevo_color
+                    Yat, Uat, Vat = _atlas(glifos, COLORES[color])
+                escribir_actual({"id": "matrix", "video": "matrix", "inicio": t0, "horas": 0,
+                                 "matrix": {"velocidad": velocidad, "color": color}})
+        d = t0 + f / FPS - time.time()                      # ritmo real: 30 fotogramas por segundo
+        if d > 0:
+            time.sleep(d)
+        elif d < -2:                                        # muy retrasado (p. ej. tras una pausa): resincroniza
+            t0 = time.time() - f / FPS
 
 
 def segundo_en_negro():
@@ -78,9 +225,11 @@ def reproducir(item):
             fotogramas += 1
             if fotogramas % FPS:
                 continue
-            # una vez por segundo: ¿saltar?, ¿han cambiado las horas o la cola?
+            # una vez por segundo: ¿saltar?, ¿video infinito?, ¿han cambiado las horas o la cola?
             if SALTAR.exists():
                 SALTAR.unlink(missing_ok=True)
+                return True
+            if leer_infinita():
                 return True
             try:
                 m = COLA.stat().st_mtime
@@ -107,6 +256,11 @@ def main():
     actual_id, pos = None, -1
     fallos = 0
     while True:
+        cfg = leer_infinita()
+        if cfg:
+            tocar_matrix(cfg)
+            escribir_actual({})
+            continue
         cola = leer_cola()
         if not cola:
             segundo_en_negro()

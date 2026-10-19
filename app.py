@@ -24,7 +24,7 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 import escenas
 import lofigen
 
-VERSION = "2.3"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
+VERSION = "2.4"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
 BASE = Path(__file__).parent
 TRACKS_DIR = BASE / "data" / "tracks"
 VIDEOS_DIR = BASE / "data" / "videos"    # biblioteca de videos + cola
@@ -697,6 +697,56 @@ def api_infinita():
     return jsonify(ok=True, infinita=estado_infinita())
 
 
+# Video infinito (lluvia de letras tipo Matrix generada en tiempo real por videofeeder.py)
+VIDEO_INF_FILE = VIDEOS_DIR / "infinita.json"
+VIDEO_INF_DEF = {"activo": False, "velocidad": 5, "color": "verde"}
+VIDEO_INF_COLORES = {"verde": "Verde", "azul": "Azul", "cian": "Cian", "ambar": "Ámbar", "rojo": "Rojo",
+                     "morado": "Morado", "blanco": "Blanco"}
+
+
+def estado_video_infinito(cfg=None):
+    cfg = cfg if cfg is not None else load_config()
+    d = {**VIDEO_INF_DEF, **(cfg.get("video_infinito") or {})}
+    d["activo"] = bool(d["activo"])
+    try:
+        d["velocidad"] = min(max(int(d["velocidad"]), 1), 10)
+    except (TypeError, ValueError):
+        d["velocidad"] = 5
+    d["color"] = d["color"] if d["color"] in VIDEO_INF_COLORES else "verde"
+    return d
+
+
+def aplicar_video_infinito(d):
+    with _io_lock:
+        escribir_json(VIDEO_INF_FILE, d)
+
+
+aplicar_video_infinito(estado_video_infinito())   # al arrancar, según la configuración guardada
+
+
+@app.post("/api/video_infinito")
+def api_video_infinito():
+    data = request.get_json(force=True) or {}
+    d = estado_video_infinito()
+    if "activo" in data:
+        d["activo"] = bool(data["activo"])
+    if "velocidad" in data:
+        try:
+            v = int(data["velocidad"])
+        except (TypeError, ValueError):
+            return jsonify(error="velocidad no válida"), 400
+        if not 1 <= v <= 10:
+            return jsonify(error="la velocidad va de 1 a 10"), 400
+        d["velocidad"] = v
+    if "color" in data:
+        if data["color"] not in VIDEO_INF_COLORES:
+            return jsonify(error="color desconocido"), 400
+        d["color"] = data["color"]
+    actualizar_config(video_infinito=d)
+    aplicar_video_infinito(d)
+    return jsonify(ok=True, video_infinito=d)
+
+
 @app.post("/api/youtube_url")
 def api_youtube_url():
     """Enlace del canal o del directo de YouTube para el botón «Abrir» del panel (vacío = quitar)."""
@@ -1254,6 +1304,7 @@ def api_state():
         has_key=bool(cfg.get("rtmp_key")),
         aleatorio=estado_aleatorio(cfg),
         infinita=estado_infinita(cfg),
+        video_infinito={**estado_video_infinito(cfg), "colores": VIDEO_INF_COLORES},
         youtube_url=str(cfg.get("youtube_url") or ""),
         version=VERSION,
         tracks=tracks)

@@ -389,6 +389,8 @@
 
   /* ---------- música: canción del directo ---------- */
   .mtools { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 10px; padding: 0 10px 12px; }
+  #pane-videos .mtools { grid-template-columns: minmax(0,1fr) auto auto auto; }
+  .vinf-chip i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
   .hdr-musica { display: flex; gap: 6px; margin-left: 8px; } .hdr-musica[hidden] { display: none; }
   .btn.inf { gap: 7px; } .btn.inf svg { width: 18px; height: 18px; }
   .btn.inf.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
@@ -819,6 +821,19 @@
           <button class="btn sm shuffle" id="q-shuffle" onclick="alternarAleatorio('video')" title="Activa el modo aleatorio de los videos: los videos en bucle se emitirán en orden aleatorio" aria-pressed="false">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
           </button>
+          <button class="btn sm inf" id="v-inf" onclick="alternarVideoInfinito()" title="Video infinito: lluvia de letras tipo Matrix generada en tiempo real, en vez de la cola de videos" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.2 8a4 4 0 1 1 0 8c-3.3 0-5.1-8-12.4-8a4 4 0 1 0 0 8c3.3 0 5.1-8 12.4-8"/></svg>Video infinito
+          </button>
+        </div>
+        <div class="infpanel" id="vinf-panel" hidden>
+          <div class="ih"><b>Video infinito</b><span>lluvia de letras tipo Matrix que se genera sola mientras se emite; la velocidad y el color cambian al instante</span><small id="vinf-now"></small></div>
+          <div class="inf-rota" id="vinf-colores"><span>Color</span></div>
+          <div class="inf-tempo">
+            <span>Velocidad</span><span class="lim">1</span>
+            <input type="range" id="vinf-vel" min="1" max="10" step="1" value="5" aria-label="velocidad de la lluvia">
+            <span class="lim">10</span>
+            <span class="bpm" id="vinf-vel-v">5</span>
+          </div>
         </div>
         <div style="padding:0 10px"><p id="v-err" class="err" style="margin:0 0 10px"></p></div>
         <div class="status-line vinfo-line"><span>Los videos con <b>«en bucle»</b> se emiten en este orden, cada uno el tiempo indicado, y vuelve a empezar. ▶ solo lo ves tú.</span><span id="cola-total"></span></div>
@@ -1782,10 +1797,15 @@ function tickCola() {
     fila.querySelector(".vest").textContent = `emitiendo · quedan ${hms(restante)}`;
     fila.querySelector(".qprog i").style.width = Math.min(100, (1 - restante / (a.horas * 3600)) * 100) + "%";
   }
-  $("s-vnow").textContent = a.video ? nombreVideo(a.video) : "—";
+  $("s-vnow").textContent = a.matrix ? "Video infinito · Matrix" : a.video ? nombreVideo(a.video) : "—";
   // barra «EN DIRECTO» de la pestaña Videos
   $("v-live").classList.toggle("on", !!a.id);
-  if (a.id) {
+  pintarVideoInfinito(s.video_infinito, a.matrix);
+  if (a.matrix) {
+    $("v-live-t").textContent = `Video infinito · Matrix · ${s.video_infinito?.colores?.[a.matrix.color] || a.matrix.color}`;
+    $("v-live-r").textContent = `velocidad ${a.matrix.velocidad} · generado en tiempo real desde hace ${hms(Date.now() / 1000 - a.inicio)}`;
+    $("v-live-bar").style.width = "100%";
+  } else if (a.id) {
     const total = a.horas * 3600, pas = Math.min(total, Date.now() / 1000 - a.inicio);
     const activos = lista.filter(c => c.activo), k = activos.findIndex(c => c.id === a.id);
     const sig = activos.length > 1 && k >= 0 ? activos[(k + 1) % activos.length] : null;
@@ -1815,7 +1835,7 @@ function tickCola() {
     $("m-live-t").textContent = s.stream.running ? "Preparando la música…" : "La emisión está parada";
     $("m-live-r").textContent = s.stream.running ? "" : "aquí verás qué canción suena en el directo";
   }
-  $("s-vleft").textContent = a.id ? `cambia en ${hms(restante)}` : "";
+  $("s-vleft").textContent = a.matrix ? "" : a.id ? `cambia en ${hms(restante)}` : "";
   // cuánto lleva la emisión en marcha (h:mm:ss)
   const ini = s.stream.running ? s.stream.inicio : 0, seg = ini ? Math.max(0, Math.floor(Date.now() / 1000 - ini)) : 0;
   $("s-uptime").textContent = ini ? `● ${Math.floor(seg / 3600)}:${String(Math.floor(seg % 3600 / 60)).padStart(2, "0")}:${String(seg % 60).padStart(2, "0")}` : "";
@@ -1949,6 +1969,40 @@ hacerOrdenable($("tracks"), ".track[data-name]", async filas => {
   catch (e) { toast(e.message, true); }
   knownTracks = ""; refresh();
 });
+
+// ---------------- Video infinito (lluvia de letras tipo Matrix) ----------------
+let videoInf = null, vinfArrastrando = false;
+const VINF_RGB = {verde: "#30ff60", azul: "#4a9bff", cian: "#40e6e6", ambar: "#ffb030", rojo: "#ff4444", morado: "#b060ff", blanco: "#e6e6e6"};
+function pintarVideoInfinito(d, m) {
+  if (!d) return;
+  videoInf = d;
+  $("v-inf").classList.toggle("on", d.activo); $("v-inf").setAttribute("aria-pressed", String(d.activo));
+  $("v-inf").title = d.activo ? "Video infinito activado: la cola de videos no se emite. Pulsa para volver a la cola" : "Video infinito: lluvia de letras tipo Matrix generada en tiempo real, en vez de la cola de videos";
+  $("vinf-panel").hidden = !d.activo;
+  $("q-shuffle").disabled = d.activo; $("q-skip").disabled = d.activo || !ultimoEstado?.stream?.running;
+  const cont = $("vinf-colores");
+  if (!cont.querySelector(".chip") && d.colores)
+    cont.insertAdjacentHTML("beforeend", Object.entries(d.colores).map(([k, n]) => `<button class="chip vinf-chip" data-color="${esc(k)}"><i style="background:${VINF_RGB[k] || "#fff"}"></i>${esc(n)}</button>`).join(""));
+  cont.querySelectorAll(".chip").forEach(c => c.classList.toggle("on", c.dataset.color === d.color));
+  if (!vinfArrastrando) { $("vinf-vel").value = d.velocidad; $("vinf-vel-v").textContent = d.velocidad; pintarVelocidad(); }
+  $("vinf-now").textContent = m ? "en el directo ahora" : d.activo ? "entra en cuanto acabe el fotograma actual" : "";
+}
+function pintarVelocidad() { const r = $("vinf-vel"); r.style.setProperty("--p", `${(r.value - r.min) / (r.max - r.min) * 100}%`); }
+async function alternarVideoInfinito() {
+  const activo = !videoInf?.activo;
+  try {
+    await post("/api/video_infinito", {activo});
+    toast(activo ? "Video infinito activado: lluvia de letras en el directo" : "Video infinito desactivado: vuelve la cola de videos");
+    refresh();
+  } catch (e) { toast(e.message, true); }
+}
+async function ajustarVideoInfinito(cambio, msg) {
+  try { await post("/api/video_infinito", cambio); if (msg) toast(msg); refresh(); }
+  catch (e) { toast(e.message, true); }
+}
+$("vinf-colores").addEventListener("click", e => { const c = e.target.closest(".chip"); if (!c) return; ajustarVideoInfinito({color: c.dataset.color}, `Color ${c.textContent.trim()}`); });
+$("vinf-vel").addEventListener("input", e => { vinfArrastrando = true; $("vinf-vel-v").textContent = e.target.value; pintarVelocidad(); });
+$("vinf-vel").addEventListener("change", e => { vinfArrastrando = false; ajustarVideoInfinito({velocidad: +e.target.value}, `Velocidad ${e.target.value}`); });
 
 // ---------------- Radio infinita (música procedural en tiempo real) ----------------
 let infinita = null, infArrastrando = false;
