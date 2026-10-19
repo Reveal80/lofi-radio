@@ -3,8 +3,9 @@
 # van en volúmenes para que persistan y no viajen con la imagen.
 FROM python:3.12-slim
 
+# fonts-vlgothic: katakana de media anchura para el video infinito tipo Matrix (8 MB)
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ffmpeg \
+ && apt-get install -y --no-install-recommends ffmpeg fonts-vlgothic \
  && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir flask==3.1.3 numpy==2.5.4 scipy==1.18.1

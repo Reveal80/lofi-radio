@@ -699,7 +699,7 @@ def api_infinita():
 
 # Video infinito (lluvia de letras tipo Matrix generada en tiempo real por videofeeder.py)
 VIDEO_INF_FILE = VIDEOS_DIR / "infinita.json"
-VIDEO_INF_DEF = {"activo": False, "velocidad": 5, "color": "verde"}
+VIDEO_INF_DEF = {"activo": False, "velocidad": 5, "cantidad": 5, "color": "verde"}
 VIDEO_INF_COLORES = {"verde": "Verde", "azul": "Azul", "cian": "Cian", "ambar": "Ámbar", "rojo": "Rojo",
                      "morado": "Morado", "blanco": "Blanco"}
 
@@ -708,10 +708,11 @@ def estado_video_infinito(cfg=None):
     cfg = cfg if cfg is not None else load_config()
     d = {**VIDEO_INF_DEF, **(cfg.get("video_infinito") or {})}
     d["activo"] = bool(d["activo"])
-    try:
-        d["velocidad"] = min(max(int(d["velocidad"]), 1), 10)
-    except (TypeError, ValueError):
-        d["velocidad"] = 5
+    for k in ("velocidad", "cantidad"):
+        try:
+            d[k] = min(max(int(d[k]), 1), 10)
+        except (TypeError, ValueError):
+            d[k] = 5
     d["color"] = d["color"] if d["color"] in VIDEO_INF_COLORES else "verde"
     return d
 
@@ -730,14 +731,15 @@ def api_video_infinito():
     d = estado_video_infinito()
     if "activo" in data:
         d["activo"] = bool(data["activo"])
-    if "velocidad" in data:
-        try:
-            v = int(data["velocidad"])
-        except (TypeError, ValueError):
-            return jsonify(error="velocidad no válida"), 400
-        if not 1 <= v <= 10:
-            return jsonify(error="la velocidad va de 1 a 10"), 400
-        d["velocidad"] = v
+    for k in ("velocidad", "cantidad"):
+        if k in data:
+            try:
+                v = int(data[k])
+            except (TypeError, ValueError):
+                return jsonify(error=f"{k} no válida"), 400
+            if not 1 <= v <= 10:
+                return jsonify(error=f"la {k} va de 1 a 10"), 400
+            d[k] = v
     if "color" in data:
         if data["color"] not in VIDEO_INF_COLORES:
             return jsonify(error="color desconocido"), 400

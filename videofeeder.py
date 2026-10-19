@@ -12,8 +12,8 @@ Ficheros de control (en la carpeta de videos):
   actual.json  lo que está sonando ahora (lo escribe este proceso)
   saltar       si existe, pasa al siguiente video y lo borra
   aleatorio    si existe, el siguiente video se elige al azar (modo aleatorio del panel)
-  infinita.json  {"activo", "velocidad" 1-10, "color"}: video infinito tipo Matrix generado en
-               tiempo real con numpy (lluvia de glifos) en vez de la cola; se relee cada segundo.
+  infinita.json  {"activo", "velocidad" 1-10, "cantidad" 1-10, "color"}: video infinito tipo Matrix
+               generado en tiempo real con numpy (lluvia de glifos) en vez de la cola; se relee cada segundo.
 """
 import json
 import random
@@ -56,13 +56,19 @@ def leer_infinita():
 
 
 # ── video infinito: lluvia de letras tipo Matrix ──
-# Celdas de 16x24 px (120x45). Un atlas de glifos (DejaVu Sans Mono, dibujados por ffmpeg una
-# sola vez, más sus espejos) a 32 niveles de brillo + cabeza blanca, en Y, U y V. Cada fotograma
-# es una indexación numpy del atlas con la rejilla de (nivel, glifo): ~7 ms (22 % de un núcleo).
+# Celdas de 16x24 px (120x45). Un atlas de glifos (katakana de media anchura con VL Gothic y
+# letras/dígitos/símbolos con DejaVu Sans Mono, dibujados por ffmpeg una sola vez, más sus espejos
+# como en la película) a 32 niveles de brillo + cabeza blanca, en Y, U y V. Cada fotograma es una
+# indexación numpy del atlas con la rejilla de (nivel, glifo): ~7 ms (22 % de un núcleo).
 CW, CH = 16, 24
 COLS, ROWS = W // CW, H // CH
 FUENTE = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
-GLIFOS = list("0123456789ABCDEFGHJKLMNPQRSTUVWXYZ+-*<>=:")
+FUENTE_JP = "/usr/share/fonts/truetype/vlgothic/VL-Gothic-Regular.ttf"
+LATINOS = list("0123456789ABCDEFGHJKLMNPQRSTUVWXYZ+-*<>=:")
+KANA = list("ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ")
+GLIFOS = [(c, FUENTE) for c in LATINOS] + [(c, FUENTE_JP) for c in KANA]
+if not Path(FUENTE_JP).exists():   # sin la fuente japonesa (imagen antigua): solo latinos
+    GLIFOS = [(c, FUENTE) for c in LATINOS]
 NIVELES = 32
 COLORES = {   # RGB de la cabeza de color (la cola se apaga hacia negro)
     "verde": (0, 255, 70), "azul": (40, 150, 255), "ambar": (255, 170, 30), "blanco": (225, 225, 225),
@@ -75,15 +81,15 @@ def _glifos_np():
     import numpy as np
     n = len(GLIFOS)
     esc = lambda c: c.replace("\\", "\\\\").replace(":", "\\:")   # «:» separa opciones del filtro
-    filtros = ",".join(f"drawtext=fontfile={FUENTE}:text='{esc(c)}':fontsize=21:fontcolor=white:"
-                       f"x={i * CW}+({CW}-tw)/2:y=({CH}-th)/2-1" for i, c in enumerate(GLIFOS))
+    filtros = ",".join(f"drawtext=fontfile={fuente}:text='{esc(c)}':fontsize=21:fontcolor=white:"
+                       f"x={i * CW}+({CW}-tw)/2:y=({CH}-th)/2-1" for i, (c, fuente) in enumerate(GLIFOS))
     r = subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", f"color=black:s={n * CW}x{CH}", "-vf", filtros,
                         "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"], capture_output=True, timeout=60)
     if len(r.stdout) != CH * n * CW:
         raise RuntimeError("no se pudieron dibujar los glifos: " + r.stderr.decode(errors="replace")[-300:])
     tira = np.frombuffer(r.stdout, dtype=np.uint8).reshape(CH, n * CW)
     g = [tira[:, i * CW:(i + 1) * CW] for i in range(n)]
-    g += [x[:, ::-1] for x, c in zip(g, GLIFOS) if c.isalpha()]   # espejados, como en la película
+    g += [x[:, ::-1] for x, (c, _) in zip(g, GLIFOS) if c.isalpha()]   # espejados, como en la película
     return np.stack(g).astype(np.float32) / 255
 
 
@@ -122,16 +128,18 @@ def tocar_matrix(cfg):
     cabeza = np.zeros((ROWS, COLS), bool)
     head = np.full(COLS, -1.0)                              # fila de la cabeza de cada columna (-1 = sin gota)
     vel = np.zeros(COLS)
-    espera = rng.integers(0, 90, COLS).astype(float)
 
     def ajustar(c):
         v = min(max(float(c.get("velocidad") or 5), 1), 10)
+        q = min(max(float(c.get("cantidad") or 5), 1), 10)
         cps = 3 + 2.7 * v                                   # celdas por segundo (3..30)
-        return v, cps, np.float32(.5 ** (cps / (6 * FPS)))  # la cola se apaga en ~6 celdas de recorrido
+        pausa = 420 / q ** 1.3                              # fotogramas medios entre gota y gota de una columna
+        return v, q, cps, np.float32(.5 ** (cps / (6 * FPS))), pausa   # la cola se apaga en ~6 celdas
 
-    velocidad, cps, decay = ajustar(cfg)
+    velocidad, cantidad, cps, decay, pausa = ajustar(cfg)
+    espera = rng.uniform(0, 2 * pausa, COLS)
     escribir_actual({"id": "matrix", "video": "matrix", "inicio": time.time(), "horas": 0,
-                     "matrix": {"velocidad": velocidad, "color": color}})
+                     "matrix": {"velocidad": velocidad, "cantidad": cantidad, "color": color}})
     mtime = None
     t0 = time.time()
     f = 0
@@ -155,7 +163,7 @@ def tocar_matrix(cfg):
                 cabeza[b, c] = True
             elif b > ROWS + 2:
                 head[c] = -1
-                espera[c] = rng.integers(10, 150)
+                espera[c] = rng.uniform(.2, 1.8) * pausa
         m = rng.random((ROWS, COLS)) < .02                  # parpadeo: algunos glifos cambian
         G[m] = rng.integers(0, ng, int(m.sum()))
         L = np.minimum((F * (NIVELES - 1) + .5).astype(np.int64), NIVELES - 1)
@@ -176,13 +184,16 @@ def tocar_matrix(cfg):
                 c2 = leer_infinita()
                 if not c2:
                     return
-                velocidad, cps, decay = ajustar(c2)
+                v_ant, p_ant = velocidad, pausa
+                velocidad, cantidad, cps, decay, pausa = ajustar(c2)
+                if pausa != p_ant:                          # la cantidad cambia ya: reescala las esperas
+                    espera *= pausa / p_ant
                 nuevo_color = c2.get("color") if c2.get("color") in COLORES else "verde"
                 if nuevo_color != color:
                     color = nuevo_color
                     Yat, Uat, Vat = _atlas(glifos, COLORES[color])
                 escribir_actual({"id": "matrix", "video": "matrix", "inicio": t0, "horas": 0,
-                                 "matrix": {"velocidad": velocidad, "color": color}})
+                                 "matrix": {"velocidad": velocidad, "cantidad": cantidad, "color": color}})
         d = t0 + f / FPS - time.time()                      # ritmo real: 30 fotogramas por segundo
         if d > 0:
             time.sleep(d)

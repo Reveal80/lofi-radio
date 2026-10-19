@@ -831,6 +831,12 @@
             <span class="lim">10</span>
             <span class="bpm" id="vinf-vel-v">5</span>
           </div>
+          <div class="inf-tempo">
+            <span>Cantidad</span><span class="lim">1</span>
+            <input type="range" id="vinf-cant" min="1" max="10" step="1" value="5" aria-label="cantidad de gotas">
+            <span class="lim">10</span>
+            <span class="bpm" id="vinf-cant-v">5</span>
+          </div>
         </div>
         <div style="padding:0 10px"><p id="v-err" class="err" style="margin:0 0 10px"></p></div>
         <div class="status-line vinfo-line"><span>Los videos con <b>«en bucle»</b> se emiten en este orden, cada uno el tiempo indicado, y vuelve a empezar. ▶ solo lo ves tú.</span><span id="cola-total"></span></div>
@@ -1799,7 +1805,7 @@ function tickCola() {
   pintarVideoInfinito(s.video_infinito, a.matrix);
   if (a.matrix) {
     $("v-live-t").textContent = `Video infinito · Matrix · ${s.video_infinito?.colores?.[a.matrix.color] || a.matrix.color}`;
-    $("v-live-r").textContent = `velocidad ${a.matrix.velocidad} · generado en tiempo real desde hace ${hms(Date.now() / 1000 - a.inicio)}`;
+    $("v-live-r").textContent = `velocidad ${a.matrix.velocidad} · cantidad ${a.matrix.cantidad ?? "–"} · generado en tiempo real desde hace ${hms(Date.now() / 1000 - a.inicio)}`;
     $("v-live-bar").style.width = "100%";
   } else if (a.id) {
     const total = a.horas * 3600, pas = Math.min(total, Date.now() / 1000 - a.inicio);
@@ -1980,10 +1986,14 @@ function pintarVideoInfinito(d, m) {
   if (!cont.querySelector(".chip") && d.colores)
     cont.insertAdjacentHTML("beforeend", Object.entries(d.colores).map(([k, n]) => `<button class="chip vinf-chip" data-color="${esc(k)}"><i style="background:${VINF_RGB[k] || "#fff"}"></i>${esc(n)}</button>`).join(""));
   cont.querySelectorAll(".chip").forEach(c => c.classList.toggle("on", c.dataset.color === d.color));
-  if (!vinfArrastrando) { $("vinf-vel").value = d.velocidad; $("vinf-vel-v").textContent = d.velocidad; pintarVelocidad(); }
+  if (!vinfArrastrando) {
+    $("vinf-vel").value = d.velocidad; $("vinf-vel-v").textContent = d.velocidad;
+    $("vinf-cant").value = d.cantidad ?? 5; $("vinf-cant-v").textContent = d.cantidad ?? 5;
+    pintarVelocidad();
+  }
   $("vinf-now").textContent = m ? "en el directo ahora" : d.activo ? "entra en cuanto acabe el fotograma actual" : "";
 }
-function pintarVelocidad() { const r = $("vinf-vel"); r.style.setProperty("--p", `${(r.value - r.min) / (r.max - r.min) * 100}%`); }
+function pintarVelocidad() { for (const r of [$("vinf-vel"), $("vinf-cant")]) r.style.setProperty("--p", `${(r.value - r.min) / (r.max - r.min) * 100}%`); }
 async function alternarVideoInfinito() {
   const activo = !videoInf?.activo;
   try {
@@ -1999,6 +2009,8 @@ async function ajustarVideoInfinito(cambio, msg) {
 $("vinf-colores").addEventListener("click", e => { const c = e.target.closest(".chip"); if (!c) return; ajustarVideoInfinito({color: c.dataset.color}, `Color ${c.textContent.trim()}`); });
 $("vinf-vel").addEventListener("input", e => { vinfArrastrando = true; $("vinf-vel-v").textContent = e.target.value; pintarVelocidad(); });
 $("vinf-vel").addEventListener("change", e => { vinfArrastrando = false; ajustarVideoInfinito({velocidad: +e.target.value}, `Velocidad ${e.target.value}`); });
+$("vinf-cant").addEventListener("input", e => { vinfArrastrando = true; $("vinf-cant-v").textContent = e.target.value; pintarVelocidad(); });
+$("vinf-cant").addEventListener("change", e => { vinfArrastrando = false; ajustarVideoInfinito({cantidad: +e.target.value}, `Cantidad ${e.target.value}`); });
 
 // ---------------- Radio infinita (música procedural en tiempo real) ----------------
 let infinita = null, infArrastrando = false;
