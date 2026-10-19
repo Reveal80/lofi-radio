@@ -26,7 +26,9 @@ Toda la interfaz está en español.
   con identidad propia (perfil, tonalidad, tempo, instrumentos), estructura (intro, secciones, descanso, cierre),
   melodías con pregunta y respuesta y una memoria que evita repetir combinaciones recientes. Elige el estilo, el
   tempo, los instrumentos y la variedad (baja, media, alta) mientras suena; los cambios entran en el siguiente compás.
-  Un modo de prueba compone tres piezas contrastadas en la biblioteca para compararlas.
+  Un modo de prueba compone tres piezas contrastadas en la biblioteca para compararlas. Como alternativa, la
+  **remezcla** toma tus propios MP3 de la biblioteca (por ejemplo los importados de Pixabay), los corta en frases y
+  los encadena sin fin, siguiendo, saltando y cambiando de canción al azar con fundidos.
 - **Video infinito**: lluvia de letras tipo Matrix generada en tiempo real, con velocidad y color
   ajustables mientras se emite, como alternativa a la cola de videos.
 - **Stats**: uso de CPU, memoria, red y disco del contenedor y del servidor, estado de la gráfica y

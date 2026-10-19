@@ -107,6 +107,10 @@ CONTORNOS = {"arco": (0, 1, 2, 3, 2, 1, 0), "descenso": (0, -1, -2, -3, -4, -5),
              "onda": (0, 2, 1, 3, 2, 4, 3), "vuelta": (0, 3, 2, 1, 0, -1, -2), "repetido": (0, 0, 1, 0, -1, -2, -1),
              "pregunta": (0, 1, 3, 2, 4, 3), "salto": (0, 4, 3, 2, 1, 0, -1), "bajada": (0, -2, -1, -3, -2, -4)}
 
+# ── máster de referencia (medido en las canciones lofi de Pixabay que trajo el usuario): realce de graves,
+# nivel del bajo, bombo más largo y con más cuerpo, acordes algo más bajos ──
+REF = dict(graves=(1.5, 2.1), bajoNivel=(1.0, 1.4), kv=(1.3, 1.6), kd=(.4, .55), nivAcordes=(.8, 1.05))
+
 # ── variedad: cuánto se separan las piezas entre sí y cuánto se desarrolla cada una ──────────
 VARIEDAD = {
     "bajo":  dict(candidatos=4, bpm_salto=6, tonos=(0, 0, 5, 7, 9, 3), formas=[["intro", "A", "A", "B", "A", "cierre"], ["intro", "A", "B", "A", "B", "cierre"], ["intro", "A", "A", "B", "A", "A", "cierre"]],
@@ -458,6 +462,9 @@ def componer(seed, estilo="aleatorio", E=None, variedad="medio", bpm=0, melodia=
         nombres = [p for p in nombres if p != prev.get("perfil")] or nombres
     perfil = str(rng.choice(nombres))
     P = PERFILES[perfil]
+    E = dict(E)
+    for k in ("kv", "kd", "nivAcordes"):   # el estilo manda; si no acota, el máster de referencia
+        E.setdefault({"kv": "bombo"}.get(k, k), REF[k])
     T = L.tema_aleatorio(int(rng.integers(1 << 30)), estilo, E)   # rasgos del estilo: kit, filtro, graves, sala, niveles…
     solo = bool(E.get("solo_melodia"))
     menor = T["modo"] == "menor"
@@ -492,6 +499,8 @@ def componer(seed, estilo="aleatorio", E=None, variedad="medio", bpm=0, melodia=
     # capas: cuántos instrumentos a la vez (2 acordes+melodía, 3 +notas guía, 4 +arpegio/contracanto)
     admitidos = set(E.get("inst", L.TODOS["inst"])) | set(E.get("instMel", L.TODOS["instMel"]))
     capa_opts = [x for x in P["capa"] + list(admitidos) if x not in (inst, instMel) and x in admitidos and x in L.INST]
+    if not capas or len(admitidos) > 4:   # sin acotar (estilo aleatorio o muchos activos): 3 o 4 según la pieza
+        capas = int(rng.choice([3, 3, 4]))
     capa = str(rng.choice(capa_opts[:3])) if capa_opts and capas >= 3 else None
     inst2_opts = [x for x in P["inst"] + P["instMel"] + list(admitidos) if x not in (inst, instMel, capa, "pad") and x in admitidos and x in L.INST]
     inst2 = str(rng.choice(inst2_opts[:3])) if inst2_opts and capas >= 4 else None
@@ -505,7 +514,9 @@ def componer(seed, estilo="aleatorio", E=None, variedad="medio", bpm=0, melodia=
     sw = float(rng.uniform(sw_lo, sw_hi))
     if groove in ("nada", "templo", "bossa"):
         sw = min(sw, .06)
-    lofi = float(rng.uniform(*E["lofi"])) if E.get("lofi") else float(rng.uniform(*P["lofi"]))
+    # sonido calibrado con las cinco referencias de Pixabay del usuario (2.9): mucho grave, casi nada por
+    # encima de 2 kHz; el estilo puede acotarlo (anime) y si no, el perfil (reducido un 40 %)
+    lofi = float(rng.uniform(*E["lofi"])) if E.get("lofi") else float(rng.uniform(P["lofi"][0] * .6, P["lofi"][1] * .6))
     sala = (float(rng.uniform(*E.get("sala", P["sala"]))), float(rng.uniform(1.0, 3.0)))
     novena = float(E.get("novena", P["novena"]))
     familia = str(rng.choice(P["armonia"]))
@@ -552,7 +563,8 @@ def componer(seed, estilo="aleatorio", E=None, variedad="medio", bpm=0, melodia=
         seed=int(seed), estilo=estilo, perfil=perfil, perfil_nombre=P["nombre"], variedad=variedad,
         bpm=tempo, sw=sw, tonica=tonica, modo="menor" if menor else "mayor", tono=_nombre_tono(tonica, menor),
         inst=inst, instMel=instMel, instMelB=instMelB, capa=capa, inst2=inst2, capas=int(capas), bat=groove, comp=comp, bajo=bajo, bajoTimbre=bajoTimbre,
-        kit=T["kit"], lofi=lofi, graves=T.get("graves", 0), bajoNivel=T.get("bajoNivel", 1), bajoGrave=bool(T.get("bajoGrave")),
+        kit=T["kit"], lofi=lofi, graves=T.get("graves") or float(rng.uniform(*REF["graves"])),
+        bajoNivel=T.get("bajoNivel") if E.get("bajoNivel") else float(rng.uniform(*REF["bajoNivel"])), bajoGrave=True,
         sala=sala, niveles=T["niveles"], tex=T["tex"], texVol=T.get("texVol", 1), bonsho=bool(T.get("bonsho")),
         familia=familia, progA=progA, progB=progB, idA=idA, idB=idB, acordes=acordes, esc=esc, centro_idx=centro_idx,
         registro=registro, motivos=motivos, contorno=motivos["M"]["contorno"], densidad=densidad,
@@ -634,7 +646,9 @@ class Compositor:
         E = L.con_instrumentos(L.estilo_de(estilo), tuple(opc.get("quitar", ())), tuple(opc.get("anadir", ())), False)
         variedad = str(opc.get("variedad", "medio"))
         melodia = int(opc.get("melodia", 1))
-        capas = int(opc.get("capas", 3))
+        # instrumentos a la vez: los que el usuario tenga activos (2 a 4); con más de 4 activos, 3 o 4 según la pieza
+        activos = set(E.get("inst", ())) | set(E.get("instMel", ()))
+        capas = min(4, max(2, len(activos))) if E.get("inst") else 0
         clave = (estilo, tuple(E.get("inst", ())), tuple(E.get("instMel", ())), bool(E.get("solo_melodia")), capas)
         p = self.pieza
         if opc.get("rehacer") and self.ultimo and p is not None:   # la misma sección otra vez con ajustes nuevos (melodía…)
@@ -760,9 +774,9 @@ def render_seccion(p, S, seed, fondo=0.0):
         # ── bajo ──
         if S["bajo"] and c >= S["bajo_desde"] and not solo and not final_pieza:
             r = raiz - 12
-            if p["bajoGrave"] and r > 43:
+            if p["bajoGrave"] and r > 40:   # zona sub: 41-55 Hz
                 r -= 12
-            r_sig = raiz_sig - 12 - (12 if p["bajoGrave"] and raiz_sig - 12 > 43 else 0)
+            r_sig = raiz_sig - 12 - (12 if p["bajoGrave"] and raiz_sig - 12 > 40 else 0)
             cambia = (c + 1) % nA != c % nA and raiz_sig != raiz
             _bajo(p["bajo"], resto, r, r_sig, pcs, cuando, negra, corchea, rng, cambia, S["tipo"], c, p["tonica"])
         # ── batería ──

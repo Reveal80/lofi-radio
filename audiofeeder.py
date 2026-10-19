@@ -115,14 +115,19 @@ def _render_worker(req, res):
     import traceback
     import numpy as np
     import piezas
+    import remezcla
     comp = piezas.Compositor(str(D / "memoria.json"))
+    rmx = remezcla.Remezcla(str(D), str(D / "remezcla.json"))
     while True:
         item = req.get()
         if item is None:
             return
         rid, _prev, estilo, bpm, fondo, opc, seed = item
         try:
-            info, cuerpo, cola = comp.tramo(estilo, bpm, fondo, opc, seed)
+            if opc.get("fuente") == "remezcla":   # los MP3 de la biblioteca, cortados y encadenados al azar
+                info, cuerpo, cola = rmx.tramo(opc, seed)
+            else:
+                info, cuerpo, cola = comp.tramo(estilo, bpm, fondo, opc, seed)
             res.put((rid, info, cuerpo.astype(np.float32), cola.astype(np.float32)))
         except Exception as e:   # un tramo fallido no tumba la radio: se pide otro
             print(f"radio infinita: error al componer: {e}\n{traceback.format_exc()}", file=sys.stderr)
@@ -243,7 +248,7 @@ def tocar_infinita(cfg):
         else:
             azar["mel"] = (None, 0)
         return {"quitar": quitar, "anadir": anadir, "melodia": melodia, "variedad": str(c.get("variedad") or "medio"),
-                "capas": int(c.get("capas") or 3)}
+                "fuente": str(c.get("fuente") or "compositor")}
     radio.pedir(estilo, bpm, fondo(cfg), inst(cfg))
     paso = SR // 10                                    # 0,1 s por escritura
     fon, ins = fondo(cfg), inst(cfg)

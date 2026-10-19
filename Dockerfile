@@ -11,7 +11,7 @@ RUN apt-get update \
 RUN pip install --no-cache-dir flask==3.1.3 numpy==2.5.4 scipy==1.18.1
 
 WORKDIR /app
-COPY app.py audiofeeder.py videofeeder.py escenas.py lofigen.py piezas.py index.html ./
+COPY app.py audiofeeder.py videofeeder.py escenas.py lofigen.py piezas.py remezcla.py index.html ./
 COPY vendor/ vendor/
 COPY apache/ apache/
 COPY docker-compose.imagen.yml docker-compose.yml

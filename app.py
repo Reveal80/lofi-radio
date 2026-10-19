@@ -25,7 +25,7 @@ import escenas
 import lofigen
 import piezas
 
-VERSION = "2.8"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
+VERSION = "2.9"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
 BASE = Path(__file__).parent
 TRACKS_DIR = BASE / "data" / "tracks"
 VIDEOS_DIR = BASE / "data" / "videos"    # biblioteca de videos + cola
@@ -639,9 +639,10 @@ def api_aleatorio():
 # Radio infinita: música procedural compuesta en tiempo real en vez de la lista (audiofeeder.py).
 INFINITA_FILE = TRACKS_DIR / "infinita.json"
 INFINITA_DEF = {"activo": False, "estilos": ["aleatorio"], "rotar_min": 60, "bpm": 0, "textura": False,
-                "inst_quitar": [], "inst_anadir": [], "melodia": 1, "variedad": "medio", "capas": 3,
+                "inst_quitar": [], "inst_anadir": [], "melodia": 1, "variedad": "medio", "fuente": "compositor",
                 "inst_aleatorio": False, "melodia_aleatoria": False}   # bpm 0 = automático; melodia 0-3 (1 = de vez en cuando)
 ROTAR_MIN = (0, 15, 30, 60, 120, 240)   # 0 = mezclar los estilos marcados en vez de rotar
+FUENTES = ("compositor", "remezcla")      # remezcla: los MP3 de la biblioteca cortados en frases y encadenados al azar
 
 
 def estado_infinita(cfg=None):
@@ -659,7 +660,7 @@ def estado_infinita(cfg=None):
     d["melodia"] = int(d["melodia"]) if str(d.get("melodia")).isdigit() and 0 <= int(d["melodia"]) <= 3 else 1
     d["inst_aleatorio"], d["melodia_aleatoria"] = bool(d.get("inst_aleatorio")), bool(d.get("melodia_aleatoria"))
     d["variedad"] = d.get("variedad") if d.get("variedad") in piezas.VARIEDADES else "medio"   # cuánto se separan las piezas
-    d["capas"] = int(d["capas"]) if str(d.get("capas")).isdigit() and 2 <= int(d["capas"]) <= 4 else 3   # instrumentos a la vez
+    d["fuente"] = d.get("fuente") if d.get("fuente") in FUENTES else "compositor"   # compositor de piezas o remezcla de los MP3
     d["inst_estilo"] = lofigen.instrumentos_de(d["estilos"])   # los que usarían los estilos marcados (informativo)
     d["instrumentos"] = lofigen.INST_NOMBRES
     return d
@@ -699,10 +700,10 @@ def api_infinita():
         if data["melodia"] not in (0, 1, 2, 3):
             return jsonify(error="nivel de melodía no válido"), 400
         d["melodia"] = int(data["melodia"])
-    if "capas" in data:
-        if data["capas"] not in (2, 3, 4):
-            return jsonify(error="instrumentos a la vez: 2, 3 o 4"), 400
-        d["capas"] = int(data["capas"])
+    if "fuente" in data:
+        if data["fuente"] not in FUENTES:
+            return jsonify(error="fuente no válida (compositor o remezcla)"), 400
+        d["fuente"] = str(data["fuente"])
     if "variedad" in data:
         if data["variedad"] not in piezas.VARIEDADES:
             return jsonify(error="variedad no válida (bajo, medio o alto)"), 400
