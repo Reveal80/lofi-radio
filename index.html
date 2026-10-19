@@ -407,6 +407,7 @@
   .inf-tempo .lim { font: 10.5px var(--mono); color: var(--dim); }
   .inf-tempo .bpm { font: 700 13px var(--mono); color: var(--ink); min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
   .inf-tempo .btn.sm.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
+  #inf-tex { font-size: 12px; }
   .infpanel .now { font: 11.5px var(--mono); color: var(--dim); }
   .inf-rota { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
   .inf-rota .chip { cursor: pointer; } .inf-rota .chip:hover { color: var(--ink); border-color: var(--stroke-2); }
@@ -783,6 +784,7 @@
             <span class="lim">110</span>
             <span class="bpm" id="inf-bpm-v">auto</span>
             <button class="btn sm" id="inf-auto" onclick="tempoAuto()" title="Automático: el tempo deriva poco a poco dentro del rango del estilo">Auto</button>
+            <button class="btn sm" id="inf-tex" onclick="alternarTextura()" style="margin-left:auto" title="Textura de fondo (vinilo, lluvia o cinta), muy baja. Apagada por defecto">Vinilo de fondo</button>
           </div>
         </div>
         <div class="thead"><span></span><span>#</span><span>título</span><span style="text-align:center; position:relative; left:-50px">tema</span><span style="text-align:right">dur.</span><span></span></div>
@@ -1945,6 +1947,7 @@ function pintarInfinita(d, estilos) {
   const i = ultimoEstado?.musica?.infinita, nom = k => estilosMusica[k]?.nombre || k;
   $("inf-rota-txt").textContent = i?.rota_en && sel.size > 1 ? `ahora ${nom(i.estilo)} · luego ${nom(i.siguiente || sig(d.estilos, i.estilo))} en ${Math.max(0, Math.ceil((i.rota_en - Date.now() / 1000) / 60))} min` : "";
   $("inf-auto").classList.toggle("on", !d.bpm);
+  $("inf-tex").classList.toggle("on", !!d.textura);
   if (!infArrastrando) {
     const vivo = ultimoEstado?.musica?.infinita?.bpm;
     $("inf-bpm").value = d.bpm || vivo || 76; pintarTempo();
@@ -1979,6 +1982,7 @@ $("inf-rota").addEventListener("click", e => {
 function pintarTempo() { const r = $("inf-bpm"); r.style.setProperty("--p", `${(r.value - r.min) / (r.max - r.min) * 100}%`); }
 $("inf-bpm").addEventListener("input", e => { infArrastrando = true; $("inf-bpm-v").textContent = `${e.target.value} bpm`; pintarTempo(); });
 $("inf-bpm").addEventListener("change", e => { infArrastrando = false; ajustarInfinita({bpm: +e.target.value}, `Tempo fijo a ${e.target.value} bpm`); });
+function alternarTextura() { const on = !infinita?.textura; ajustarInfinita({textura: on}, on ? "Textura de fondo activada (baja)" : "Textura de fondo quitada"); }
 function tempoAuto() {
   if (!infinita?.bpm) return ajustarInfinita({bpm: +$("inf-bpm").value}, `Tempo fijo a ${$("inf-bpm").value} bpm`);
   ajustarInfinita({bpm: 0}, "Tempo automático: deriva poco a poco según el estilo");

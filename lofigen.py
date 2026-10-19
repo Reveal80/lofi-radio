@@ -282,10 +282,11 @@ def guino(buf, T, t, corchea):
 
 # ── el compás y la estructura de 16 (port directo de compas()) ──
 
-def render_theme(T, cycles, seed, continuo=False):
+def render_theme(T, cycles, seed, continuo=False, fondo=1.0):
     """Renderiza el tema. Con continuo=True (radio infinita) no hay entrada filtrada ni fundidos
     y devuelve (cuerpo, cola): los compases exactos y los 4 s de resonancia que se superponen
-    al tramo siguiente, para enlazar tramos sin cortes."""
+    al tramo siguiente, para enlazar tramos sin cortes. fondo: nivel de la textura (vinilo, lluvia,
+    cinta); 0 la quita (en la radio infinita el usuario la oía como ruido blanco)."""
     global _RNG, _KIT, _BAJO
     _RNG = np.random.default_rng(seed)
     _KIT = {**KIT_BASE, **T.get("kit", {})}
@@ -399,7 +400,8 @@ def render_theme(T, cycles, seed, continuo=False):
         apagado = lowpass(mix[:fin], 450)
         w = np.linspace(0, 1, fin) ** 2
         mix[:fin] = apagado * (1 - w) + mix[:fin] * w
-    mix += textura(total, T.get("tex", "vinilo")) * .5 * T.get("texVol", 1)
+    if fondo:
+        mix += textura(total, T.get("tex", "vinilo")) * .5 * T.get("texVol", 1) * fondo
     if not continuo:
         f_in, f_out = int(2.5 * SR), int(3 * SR)
         mix[:f_in] *= np.linspace(0, 1, f_in)
@@ -632,6 +634,7 @@ def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None):
         if "bat" in cambios or "armonia" in cambios:
             T["sw"] = nuevo["sw"]
         T["bpm"] = prev["bpm"]
+    T.pop("guino", None)   # sin guiños de 8 bits en la radio infinita (al usuario le sonaban a videojuego)
     if bpm:
         T["bpm"] = int(bpm)
     elif prev is not None:   # deriva: hacia el rango del estilo, como mucho 4 bpm por tramo

@@ -618,7 +618,7 @@ def api_aleatorio():
 
 # Radio infinita: música procedural compuesta en tiempo real en vez de la lista (audiofeeder.py).
 INFINITA_FILE = TRACKS_DIR / "infinita.json"
-INFINITA_DEF = {"activo": False, "estilos": ["aleatorio"], "rotar_min": 60, "bpm": 0}   # bpm 0 = automático
+INFINITA_DEF = {"activo": False, "estilos": ["aleatorio"], "rotar_min": 60, "bpm": 0, "textura": False}   # bpm 0 = automático
 ROTAR_MIN = (15, 30, 60, 120, 240)
 
 
@@ -631,6 +631,7 @@ def estado_infinita(cfg=None):
     d["estilos"] = [e for e in d["estilos"] if e in lofigen.ESTILOS] or ["aleatorio"]
     d["rotar_min"] = int(d["rotar_min"]) if d["rotar_min"] in ROTAR_MIN else 60
     d["bpm"] = int(d["bpm"]) if str(d["bpm"]).isdigit() and 50 <= int(d["bpm"]) <= 110 else 0
+    d["textura"] = bool(d.get("textura"))   # vinilo/lluvia de fondo; apagado por defecto (sonaba a ruido blanco)
     return d
 
 
@@ -659,6 +660,8 @@ def api_infinita():
         if data["rotar_min"] not in ROTAR_MIN:
             return jsonify(error="intervalo no válido"), 400
         d["rotar_min"] = int(data["rotar_min"])
+    if "textura" in data:
+        d["textura"] = bool(data["textura"])
     if "bpm" in data:
         try:
             bpm = int(data["bpm"] or 0)
