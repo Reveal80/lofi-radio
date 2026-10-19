@@ -282,7 +282,10 @@ def guino(buf, T, t, corchea):
 
 # ── el compás y la estructura de 16 (port directo de compas()) ──
 
-def render_theme(T, cycles, seed):
+def render_theme(T, cycles, seed, continuo=False):
+    """Renderiza el tema. Con continuo=True (radio infinita) no hay entrada filtrada ni fundidos
+    y devuelve (cuerpo, cola): los compases exactos y los 4 s de resonancia que se superponen
+    al tramo siguiente, para enlazar tramos sin cortes."""
     global _RNG, _KIT, _BAJO
     _RNG = np.random.default_rng(seed)
     _KIT = {**KIT_BASE, **T.get("kit", {})}
@@ -391,18 +394,23 @@ def render_theme(T, cycles, seed):
     mix = reverb(bus * pump + melb, *sala) + resto + bat * niv["bateria"]
     if T.get("lofi"):   # carácter de la canción: más o menos «apagada»
         mix = lowpass(mix, T["lofi"])
-    if T.get("intro_filtro"):   # la entrada suena como a través de una pared y se abre
+    if T.get("intro_filtro") and not continuo:   # la entrada suena como a través de una pared y se abre
         fin = int(2 * compas_dur * SR)
         apagado = lowpass(mix[:fin], 450)
         w = np.linspace(0, 1, fin) ** 2
         mix[:fin] = apagado * (1 - w) + mix[:fin] * w
     mix += textura(total, T.get("tex", "vinilo")) * .5 * T.get("texVol", 1)
-    f_in, f_out = int(2.5 * SR), int(3 * SR)
-    mix[:f_in] *= np.linspace(0, 1, f_in)
-    mix[-f_out:] *= np.linspace(1, 0, f_out)
+    if not continuo:
+        f_in, f_out = int(2.5 * SR), int(3 * SR)
+        mix[:f_in] *= np.linspace(0, 1, f_in)
+        mix[-f_out:] *= np.linspace(1, 0, f_out)
     # máster: nivela a ~-16 dBFS RMS y redondea los picos con un limitador suave
     mix = mix / (np.sqrt(np.mean(mix ** 2)) + 1e-9) * 10 ** (-16 / 20)
     mix = np.tanh(mix * 1.4) / 1.4
+    if continuo:   # sin normalizar al pico: así todos los tramos salen al mismo nivel
+        corte = int(cycles * 16 * compas_dur * SR)
+        cola = mix[corte:] * np.linspace(1, 0, total - corte)
+        return mix[:corte], cola
     return mix / np.max(np.abs(mix)) * .92
 
 # ── compositor de temas nuevos ──
@@ -569,7 +577,63 @@ def tema_aleatorio(seed, estilo="aleatorio"):
             tn += 12
         tema["tonica"] = tn
     tema["mel"] = _mel_aleatoria(rng, tonica, acordes, menor, elige("densidad"))
+    tema["raiz"] = tonica   # para poder componer otra melodía sobre los mismos acordes (radio infinita)
     return tema
+
+
+# ── radio infinita: tramos encadenados que cambian poco a poco ──
+
+_GRUPOS = {   # parámetros que viajan juntos al pasar de un tramo al siguiente
+    "armonia": ("modo", "acordes", "acordesB", "mel", "guino", "tonica", "raiz"),
+    "inst": ("inst",), "instMel": ("instMel",), "bat": ("bat", "kit", "break"), "bajo": ("bajo", "bajoTimbre"),
+    "comp": ("comp",), "tex": ("tex", "texVol"), "sala": ("sala",), "lofi": ("lofi",), "niveles": ("niveles",),
+}
+_ACOTADOS = ("inst", "instMel", "bat", "bajo", "tex", "comp")   # listas que cada estilo restringe
+
+
+def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None):
+    """Compone el tramo siguiente de la radio infinita: hereda casi todo del anterior y cambia
+    uno o dos grupos de parámetros. Si el estilo pedido no admite algo del tramo anterior
+    (instrumento, batería…), lo va acercando al estilo de dos en dos cosas por tramo, así el
+    cambio de estilo se nota poco a poco. bpm fijo si se da; si no, deriva dentro del estilo."""
+    E = ESTILOS.get(estilo, ESTILOS["aleatorio"])
+    rng = np.random.default_rng(seed)
+    nuevo = tema_aleatorio(int(rng.integers(1 << 30)), estilo)
+    if prev is None:
+        T = nuevo
+    else:
+        T = dict(prev)
+        T.pop("intro_filtro", None)
+        fuera = [g for g in _ACOTADOS if g in E and prev.get(g) not in E[g]]
+        cambios = set(fuera[:2])
+        n = 1 + int(rng.random() < .35)
+        libres = [g for g in _GRUPOS if g not in cambios]
+        cambios.update(str(g) for g in rng.choice(libres, size=n, replace=False))
+        for g in cambios:
+            for k in _GRUPOS[g]:
+                if k in nuevo:
+                    T[k] = nuevo[k]
+                else:
+                    T.pop(k, None)
+        if "armonia" not in cambios and rng.random() < .4:   # otra melodía sobre los mismos acordes
+            dens = str(rng.choice(E.get("densidad", TODOS["densidad"])))
+            T["mel"] = _mel_aleatoria(rng, T["raiz"], T["acordes"], T["modo"] == "menor", dens)
+        if T["inst"] == "pad" and T["comp"] in ("stabs", "charleston", "roto"):
+            T["comp"] = "pad"
+        if "bat" in cambios or "armonia" in cambios:
+            T["sw"] = nuevo["sw"]
+        T["bpm"] = prev["bpm"]
+    if bpm:
+        T["bpm"] = int(bpm)
+    elif prev is not None:   # deriva: hacia el rango del estilo, como mucho 4 bpm por tramo
+        lo, hi = E.get("bpm", (60, 92))
+        objetivo = min(max(T["bpm"], lo), hi)
+        if objetivo != T["bpm"]:
+            T["bpm"] += max(-4, min(4, objetivo - T["bpm"]))
+        elif rng.random() < .3:
+            T["bpm"] = min(max(T["bpm"] + int(rng.integers(-3, 4)), lo), hi)
+    T["cambios"] = sorted(cambios) if prev is not None else []
+    return T
 
 
 def generate_random(seed, outdir, estilo="aleatorio"):

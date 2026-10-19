@@ -389,6 +389,22 @@
 
   /* ---------- música: canción del directo ---------- */
   .mtools { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 10px; padding: 0 10px 12px; }
+  .hdr-musica { display: flex; gap: 6px; margin-left: 8px; } .hdr-musica[hidden] { display: none; }
+  .hdr-musica .btn.shuffle { width: 34px; align-self: auto; height: 34px; }
+  .btn.inf { gap: 7px; } .btn.inf svg { width: 18px; height: 18px; }
+  .btn.inf.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
+  .btn.inf.on svg { animation: spin 6s linear infinite; }
+  .infpanel { margin: 0 10px 12px; padding: 12px 14px; border-radius: 14px; background: rgba(94,230,160,.05); border: 1px solid rgba(94,230,160,.22); display: flex; flex-direction: column; gap: 10px; }
+  .infpanel .ih { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+  .infpanel .ih b { color: var(--ink); }
+  .infpanel .ih small { margin-left: auto; font: 11px var(--mono); color: var(--dim); }
+  .infpanel .escenas { grid-template-columns: repeat(8, 1fr); }
+  .inf-tempo { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted); }
+  .inf-tempo input[type=range] { max-width: 320px; }
+  .inf-tempo .bpm { font: 700 13px var(--mono); color: var(--ink); min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
+  .inf-tempo .btn.sm.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
+  .infpanel .now { font: 11.5px var(--mono); color: var(--dim); }
+  @media (max-width: 900px) { .infpanel .escenas { grid-template-columns: repeat(4, 1fr); } }
   .btn.shuffle { padding: 0; width: 40px; align-self: stretch; justify-content: center; color: var(--muted); }
   .btn.shuffle svg { width: 17px; height: 17px; }
   .btn.shuffle.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
@@ -725,6 +741,14 @@
             <p class="hint" style="margin:10px 0 0; font-size:12px">Se detecta solo: el audio va a <b>Música</b> (entra en el directo al azar); los videos y las imágenes a <b>Videos</b>, desactivados hasta que actives «en bucle». Una imagen se convierte en un video fijo de 10 s sin audio, que ocupa muy poco.</p>
           </div>
         </div>
+        <div class="hdr-musica" id="hdr-musica" hidden>
+        <button class="btn sm shuffle" id="m-shuffle" onclick="alternarAleatorio('musica')" title="Activa el modo aleatorio de la música: las canciones sonarán en orden aleatorio" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+        </button>
+        <button class="btn sm inf" id="m-inf" onclick="alternarInfinita()" title="Radio infinita: compone música lofi en tiempo real, sin fin y sin usar la lista" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.2 8a4 4 0 1 1 0 8c-3.3 0-5.1-8-12.4-8a4 4 0 1 0 0 8c3.3 0 5.1-8 12.4-8"/></svg>Radio infinita
+        </button>
+        </div>
         <div class="field search">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--dim)" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           <input id="q" placeholder="Buscar video…" oninput="filtrar()">
@@ -740,9 +764,16 @@
           <button class="btn" id="m-skip" onclick="saltarCancion()" title="Pasa a otra canción en el directo sin cortar la emisión">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg>Siguiente canción
           </button>
-          <button class="btn sm shuffle" id="m-shuffle" onclick="alternarAleatorio('musica')" title="Activa el modo aleatorio de la música: las canciones sonarán en orden aleatorio" aria-pressed="false">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
-          </button>
+        </div>
+        <div class="infpanel" id="inf-panel" hidden>
+          <div class="ih"><b>Radio infinita</b><span>la música se compone sola mientras suena: elige el estilo y el tempo y cambia cuando quieras, entra en el siguiente compás</span><small id="inf-now"></small></div>
+          <div class="escenas" id="inf-estilos"></div>
+          <div class="inf-tempo">
+            <span>Tempo</span>
+            <input type="range" id="inf-bpm" min="50" max="110" step="1" value="76" aria-label="tempo en bpm">
+            <span class="bpm" id="inf-bpm-v">auto</span>
+            <button class="btn sm" id="inf-auto" onclick="tempoAuto()" title="Automático: el tempo deriva poco a poco dentro del rango del estilo">Auto</button>
+          </div>
         </div>
         <div class="thead"><span></span><span>#</span><span>título</span><span style="text-align:center; position:relative; left:-50px">tema</span><span style="text-align:right">dur.</span><span></span></div>
         <div class="tracklist" id="tracks"></div>
@@ -1238,6 +1269,7 @@ async function refresh() {
   $("v-btn").disabled = s.video.running;
   pintarTipos(s.tipos_escena);
   pintarEstilos(s.estilos_musica);
+  pintarInfinita(s.infinita, s.estilos_musica);
   const escenaEnCurso = s.video.running && s.video.total;
   const ep = $("e-prog");
   ep.classList.toggle("indet", !!escenaEnCurso && s.video.done === 0);
@@ -1615,6 +1647,7 @@ function verTab(t) {
   tabActual = t;
   document.querySelectorAll(".tab[data-tab]").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
   $("pane-musica").hidden = t !== "musica"; $("pane-videos").hidden = t !== "videos";
+  $("hdr-musica").hidden = t !== "musica";   // aleatorio y radio infinita, junto a «Subir», solo en Música
   $("q").placeholder = t === "musica" ? "Buscar canción…" : "Buscar video…";
   filtrar();
 }
@@ -1730,7 +1763,13 @@ function tickCola() {
   const mu = s.stream.running ? (s.musica || {}) : {}, t = mu.name && tracks[mu.name];
   $("m-live").classList.toggle("on", !!mu.name);
   $("m-skip").disabled = !s.stream.running;
-  if (mu.name) {
+  if (mu.infinita) {
+    const i = mu.infinita, pas = Date.now() / 1000 - mu.inicio, dur = mu.dur || 0;
+    $("m-live-t").textContent = `Radio infinita · ${i.estilo_nombre} · ${i.bpm} bpm`;
+    $("m-live-r").textContent = `tramo ${i.n} · ${fmt(Math.min(pas, dur))} / ${fmt(dur)} · ${i.inst} + ${i.instMel} · batería ${i.bat} · ${i.modo}`;
+    $("m-live-bar").style.width = dur ? Math.min(100, pas / dur * 100) + "%" : "0";
+    $("inf-now").textContent = i.cambios?.length ? "cambió: " + i.cambios.join(", ") : "";
+  } else if (mu.name) {
     const pas = Date.now() / 1000 - mu.inicio, dur = mu.dur || t?.dur || 0;
     $("m-live-t").textContent = t ? t.title : mu.name;
     const k = orden.indexOf(mu.name), sig = orden.length > 1 && k >= 0 ? tracks[orden[(k + 1) % orden.length]] : null;
@@ -1875,6 +1914,50 @@ hacerOrdenable($("tracks"), ".track[data-name]", async filas => {
   knownTracks = ""; refresh();
 });
 
+// ---------------- Radio infinita (música procedural en tiempo real) ----------------
+let infinita = null, infArrastrando = false;
+function pintarInfinita(d, estilos) {
+  if (!d) return;
+  infinita = d;
+  $("m-inf").classList.toggle("on", d.activo); $("m-inf").setAttribute("aria-pressed", String(d.activo));
+  $("m-inf").title = d.activo ? "Radio infinita activada: la música se compone en tiempo real y la lista no suena. Pulsa para volver a la lista"
+                              : "Radio infinita: compone música lofi en tiempo real, sin fin y sin usar la lista";
+  $("inf-panel").hidden = !d.activo;
+  $("m-shuffle").disabled = d.activo;
+  $("m-skip").title = d.activo ? "Pasa al siguiente tramo de la radio infinita (en el siguiente compás)" : "Pasa a otra canción en el directo sin cortar la emisión";
+  if (!$("inf-estilos").childElementCount && estilos)
+    $("inf-estilos").innerHTML = Object.entries(estilos).map(([k, e]) =>
+      `<button class="escena" data-estilo="${esc(k)}" title="${esc(e.desc)}"><span class="em">${ICONO_ESTILO[k] || ICONO_ESTILO.jazz}</span><span class="en">${esc(e.nombre)}</span></button>`).join("");
+  document.querySelectorAll("#inf-estilos .escena").forEach(x => x.classList.toggle("on", x.dataset.estilo === d.estilo));
+  $("inf-auto").classList.toggle("on", !d.bpm);
+  if (!infArrastrando) {
+    const vivo = ultimoEstado?.musica?.infinita?.bpm;
+    $("inf-bpm").value = d.bpm || vivo || 76;
+    $("inf-bpm-v").textContent = d.bpm ? `${d.bpm} bpm` : vivo ? `auto · ${vivo}` : "auto";
+  }
+}
+async function alternarInfinita() {
+  const activo = !infinita?.activo;
+  try {
+    await post("/api/infinita", {activo});
+    toast(activo ? "Radio infinita activada: la música se compone en tiempo real" : "Radio infinita desactivada: vuelve la lista");
+    refresh();
+  } catch (e) { toast(e.message, true); }
+}
+async function ajustarInfinita(cambio, msg) {
+  try { await post("/api/infinita", cambio); if (msg) toast(msg); refresh(); }
+  catch (e) { toast(e.message, true); }
+}
+$("inf-estilos").addEventListener("click", e => {
+  const b = e.target.closest(".escena"); if (!b) return;
+  ajustarInfinita({estilo: b.dataset.estilo}, `Cambiando a ${b.querySelector(".en").textContent}: entra en el siguiente compás`);
+});
+$("inf-bpm").addEventListener("input", e => { infArrastrando = true; $("inf-bpm-v").textContent = `${e.target.value} bpm`; });
+$("inf-bpm").addEventListener("change", e => { infArrastrando = false; ajustarInfinita({bpm: +e.target.value}, `Tempo fijo a ${e.target.value} bpm`); });
+function tempoAuto() {
+  if (!infinita?.bpm) return ajustarInfinita({bpm: +$("inf-bpm").value}, `Tempo fijo a ${$("inf-bpm").value} bpm`);
+  ajustarInfinita({bpm: 0}, "Tempo automático: deriva poco a poco según el estilo");
+}
 function pintarAleatorio(id, activo, ahora, luego) {
   const b = $(id); activo = !!activo;
   b.classList.toggle("on", activo); b.setAttribute("aria-pressed", String(activo));

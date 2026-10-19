@@ -24,7 +24,7 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 import escenas
 import lofigen
 
-VERSION = "2.2"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
+VERSION = "2.3"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
 BASE = Path(__file__).parent
 TRACKS_DIR = BASE / "data" / "tracks"
 VIDEOS_DIR = BASE / "data" / "videos"    # biblioteca de videos + cola
@@ -616,6 +616,51 @@ def api_aleatorio():
     return jsonify(ok=True, aleatorio=estado)
 
 
+# Radio infinita: música procedural compuesta en tiempo real en vez de la lista (audiofeeder.py).
+INFINITA_FILE = TRACKS_DIR / "infinita.json"
+INFINITA_DEF = {"activo": False, "estilo": "aleatorio", "bpm": 0}   # bpm 0 = automático (deriva según el estilo)
+
+
+def estado_infinita(cfg=None):
+    cfg = cfg if cfg is not None else load_config()
+    d = {**INFINITA_DEF, **(cfg.get("infinita") or {})}
+    d["activo"] = bool(d["activo"])
+    d["estilo"] = d["estilo"] if d["estilo"] in lofigen.ESTILOS else "aleatorio"
+    d["bpm"] = int(d["bpm"]) if str(d["bpm"]).isdigit() and 50 <= int(d["bpm"]) <= 110 else 0
+    return d
+
+
+def aplicar_infinita(d):
+    with _io_lock:
+        escribir_json(INFINITA_FILE, d)
+
+
+aplicar_infinita(estado_infinita())   # al arrancar, según la configuración guardada
+
+
+@app.post("/api/infinita")
+def api_infinita():
+    data = request.get_json(force=True) or {}
+    d = estado_infinita()
+    if "activo" in data:
+        d["activo"] = bool(data["activo"])
+    if "estilo" in data:
+        if data["estilo"] not in lofigen.ESTILOS:
+            return jsonify(error="estilo desconocido"), 400
+        d["estilo"] = data["estilo"]
+    if "bpm" in data:
+        try:
+            bpm = int(data["bpm"] or 0)
+        except (TypeError, ValueError):
+            return jsonify(error="tempo no válido"), 400
+        if bpm and not 50 <= bpm <= 110:
+            return jsonify(error="el tempo va de 50 a 110 bpm (0 = automático)"), 400
+        d["bpm"] = bpm
+    actualizar_config(infinita=d)
+    aplicar_infinita(d)
+    return jsonify(ok=True, infinita=d)
+
+
 @app.post("/api/youtube_url")
 def api_youtube_url():
     """Enlace del canal o del directo de YouTube para el botón «Abrir» del panel (vacío = quitar)."""
@@ -1172,6 +1217,7 @@ def api_state():
                 "reinicios": watchdog["reinicios"], "ultimo": watchdog["ultimo"]},
         has_key=bool(cfg.get("rtmp_key")),
         aleatorio=estado_aleatorio(cfg),
+        infinita=estado_infinita(cfg),
         youtube_url=str(cfg.get("youtube_url") or ""),
         version=VERSION,
         tracks=tracks)
