@@ -107,6 +107,14 @@ INST = {
     "clarinete": dict(modo="viento", onda="square", formantes=[(700, 1.8, 1), (1600, 2.5, .35)],
                      filtro=2400, vib=(.2, 5, .35), soplo=(.025, 1800), scoop=.012, nivel=.8,
                      ataque=.05, caida=.4, sostiene=.6),
+    # templo japonés (2026-10-19): koto (cuerda pulsada), shakuhachi (flauta de bambú con mucho
+    # soplo y entrada «meri» por debajo), bonshō (campana grave inarmónica que resuena segundos)
+    # y cuenco tibetano (parciales inarmónicos con batido lento)
+    "koto":       dict(modo="cuerda", filtro=3000, ataque=.002, caida=1.0, sostiene=.2),
+    "shakuhachi": dict(modo="flauta", filtro=2600, soplo=.4, scoop=.03, ataque=.12, caida=.5, sostiene=.75),
+    "bonsho":     dict(modo="fm", fm=(1.2, 1.41, 1.5), filtro=1500, octava=-12, ataque=.004, caida=4.5, sostiene=.15),
+    "cuenco":     dict(armonicos=[(1, 1), (2.71, .5), (5.4, .18), (8.9, .06)], filtro=2400, tremolo=2.6,
+                       ataque=.03, caida=3.0, sostiene=.3),
 }
 
 
@@ -156,8 +164,9 @@ def tocar_nota(buf, inst, m, t, dur, vol, cinta=False):
     modo, f0 = I.get("modo"), hz(m) * cents(bamboleo)
     if modo == "cuerda":
         out = _cuerda(f0, n)
-    elif modo == "fm":     # campana: FM con índice que se apaga
-        out = np.sin(2 * np.pi * f0 * tt + 1.6 * np.exp(-tt / .45) * np.sin(2 * np.pi * f0 * 3.5 * tt))
+    elif modo == "fm":     # campana: FM con índice que se apaga (índice, relación, caída del índice)
+        ind, rel, cai = I.get("fm", (1.6, 3.5, .45))
+        out = np.sin(2 * np.pi * f0 * tt + ind * np.exp(-tt / cai) * np.sin(2 * np.pi * f0 * rel * tt))
     elif modo == "viento":  # saxo, trompeta con sordina, clarinete
         prof, vel, tarda = I["vib"]
         vib = 1 + (prof / 100) * np.sin(2 * np.pi * vel * tt) * (1 - np.exp(-tt / tarda))
@@ -173,9 +182,10 @@ def tocar_nota(buf, inst, m, t, dur, vol, cinta=False):
         out += bandpass_q(_RNG.standard_normal(n), f_soplo, 1.5) * nivel_soplo * np.exp(-tt / .25)
     elif modo == "flauta":  # seno con vibrato tardío y algo de soplo
         vib = 1 + .006 * np.sin(2 * np.pi * 5 * tt) * (1 - np.exp(-tt / .3))
+        vib *= 1 - I.get("scoop", 0) * np.exp(-tt / .15)
         fase = 2 * np.pi * np.cumsum(f0 * vib) / SR
         out = np.sin(fase) + .25 * np.sin(2 * fase) + .08 * np.sin(3 * fase)
-        out += bandpass_q(_RNG.standard_normal(n), min(f0 * 2, 8000), 2) * .15
+        out += bandpass_q(_RNG.standard_normal(n), min(f0 * 2, 8000), 2) * I.get("soplo", .15)
     elif "onda" in I:
         voces = I.get("voces", 1)
         for v in range(voces):
@@ -263,6 +273,7 @@ RITMOS = {
     "perezoso": {"K": "x.....x.", "S": "....x...", "H": "xxxxxxxx"},
     "doble":   {"K": "x.x...x.", "S": "..x..rx.", "H": "x.xxx.x."},
     "nada":    {"K": "........", "S": "........", "H": "........"},
+    "templo":  {"K": "........", "S": "........", "H": "........", "W": "x.....x."},   # W = bloque de madera
 }
 
 # ── las texturas (bucle de ruido de fondo, como el buffer de la referencia) ──
@@ -395,8 +406,12 @@ def render_theme(T, cycles, seed, continuo=False, fondo=1.0):
                     golpe(bat, cuando(i), .025, "highpass", 6500 * _KIT["hh"], .22)
                 if _KIT["shaker"]:   # maraca suave a semicorcheas
                     golpe(bat, cuando(i) + corchea / 2, .008, "highpass", 9000, .03)
-            if c in (9, 13):   # redoble suave antes de cambiar
+                if R.get("W", "........")[i] == "x":   # mokugyo: golpe hueco de madera
+                    golpe(bat, cuando(i), .09, "bandpass", 1000, .035)
+            if c in (9, 13) and "x" in R["S"]:   # redoble suave antes de cambiar
                 golpe(bat, cuando(7), .07, "bandpass", 1200, .3)
+        if T.get("bonsho") and c % 8 == 0:   # campana de templo al empezar cada 8 compases
+            tocar_nota(resto, "bonsho", T.get("raiz", 50) - 12, t, 5, .13)
         # el gancho: en A tal cual, en B una octava arriba y no siempre entero
         if parte in ("A", "B") and T.get("mel"):
             frase = T["mel"][(c - 2) % len(T["mel"])]
@@ -444,7 +459,11 @@ def render_theme(T, cycles, seed, continuo=False, fondo=1.0):
 # ── compositor de temas nuevos ──
 
 _QUAL = {"maj7": (0, 4, 7, 11), "m7": (0, 3, 7, 10), "7": (0, 4, 7, 10),
-         "6": (0, 4, 7, 9), "maj9": (0, 4, 7, 11, 14), "m9": (0, 3, 7, 10, 14), "9": (0, 4, 7, 10, 14)}
+         "6": (0, 4, 7, 9), "maj9": (0, 4, 7, 11, 14), "m9": (0, 3, 7, 10, 14), "9": (0, 4, 7, 10, 14),
+         "5": (0, 7, 12), "sus2": (0, 2, 7), "sus4": (0, 5, 7)}   # abiertos, para el templo
+ESCALAS = {   # pentatónicas japonesas (semitonos desde la tónica)
+    "hirajoshi": (0, 2, 3, 7, 8), "insen": (0, 1, 5, 7, 10), "yo": (0, 2, 5, 7, 9),
+}
 _PROGS_MENOR = [   # en menor natural (semitonos desde la tónica)
     [(0, "m7"), (8, "maj7"), (3, "maj7"), (10, "7")],       # i-VI-III-VII
     [(0, "m7"), (5, "m7"), (10, "7"), (3, "maj7")],         # i-iv-VII-III
@@ -481,9 +500,9 @@ _PATRONES_MEL = {
 }
 
 
-def _mel_aleatoria(rng, tonica, acordes, menor=False, densidad="normal"):
+def _mel_aleatoria(rng, tonica, acordes, menor=False, densidad="normal", grados=None):
     """Gancho: 4 frases de 8 corcheas; la densidad marca cuántas notas lleva."""
-    grados = (0, 2, 3, 5, 7, 8, 10) if menor else (0, 2, 4, 5, 7, 9, 11)
+    grados = grados or ((0, 2, 3, 5, 7, 8, 10) if menor else (0, 2, 4, 5, 7, 9, 11))
     esc = sorted({tonica + o + d for o in (12, 24) for d in grados})
     idx = min(range(len(esc)), key=lambda i: abs(esc[i] - (tonica + 19)))
     pats = _PATRONES_MEL.get(densidad, _PATRONES_MEL["normal"])
@@ -513,7 +532,7 @@ def _mel_aleatoria(rng, tonica, acordes, menor=False, densidad="normal"):
 # acompañamiento de los acordes y «densidad» cuántas notas lleva la melodía.
 TODOS = dict(
     inst=["rhodes", "rhodes", "piano", "piano", "vibra", "pad", "pulso", "guitarra", "guitarra"],
-    instMel=["vibra", "piano", "caja", "rhodes", "pulso", "chip", "flauta", "campana", "guitarra", "saxo", "trompeta", "clarinete"],
+    instMel=["vibra", "piano", "caja", "rhodes", "pulso", "chip", "flauta", "campana", "guitarra", "saxo", "trompeta", "clarinete", "shakuhachi", "koto"],
     bat=["boombap", "medio", "shuffle", "roto", "suave", "dilla", "perezoso", "doble"],
     bajo=["largo", "rebote", "caminante"], tex=["vinilo", "vinilo", "lluvia", "cinta"],
     comp=["largo", "pad", "stabs", "charleston", "arpegio", "roto"],
@@ -548,6 +567,13 @@ ESTILOS = {
                      bpm=(56, 66), sw=(.04, .08), menor=.5, inst=["pad", "pad", "vibra"], instMel=["campana", "flauta", "vibra"],
                      bat=["nada"], bajo=["largo"], tex=["cinta", "lluvia", "vinilo"], comp=["pad", "arpegio"],
                      densidad=["escasa"], guino=0, intro=1, sala=(.3, .55)),
+    "templo": dict(nombre="Templo japonés", desc="Escalas pentatónicas japonesas, koto, shakuhachi, cuencos y campana de templo; muy lento y espacioso.",
+                   bpm=(50, 60), sw=(0, .04), menor=1.0, novena=0, inst=["koto", "cuenco", "cuenco", "pad"],
+                   instMel=["shakuhachi", "shakuhachi", "koto", "campana"], bat=["templo", "templo", "nada"], bajo=["largo"],
+                   tex=["lluvia", "cinta"], comp=["arpegio", "largo", "pad"], densidad=["escasa"], guino=0, intro=0,
+                   sala=(.4, .65), escalas=["hirajoshi", "hirajoshi", "insen", "yo"], bonsho=.8, partB=.3,
+                   progs_propios=[[(0, "5"), (0, "5"), (7, "5"), (0, "5")], [(0, "5"), (3, "5"), (7, "sus2"), (0, "5")],
+                                  [(0, "sus2"), (10, "5"), (0, "5"), (7, "5")], [(0, "5"), (5, "sus2"), (0, "5"), (8, "5")]]),
     "nocturno": dict(nombre="Nocturno", desc="Para dormir: muy lento, en menor, cinta antigua y ritmo casi ausente.",
                      bpm=(54, 62), sw=(.04, .1), menor=.85, inst=["pad", "rhodes", "guitarra"],
                      instMel=["flauta", "saxo", "clarinete", "campana"], bat=["nada", "suave"], bajo=["largo"], tex=["cinta"],
@@ -593,9 +619,12 @@ def tema_aleatorio(seed, estilo="aleatorio"):
         progs = _PROGS_MENOR
     else:
         progs = [_PROGS[i] for i in E.get("progs", range(len(_PROGS)))]
-    novena = rng.random() < E.get("novena", .35)
+    if E.get("progs_propios"):   # el estilo trae sus propias vueltas (acordes abiertos del templo)
+        progs = [list(p) for p in E["progs_propios"]]
+    novena = rng.random() < E.get("novena", .35) and not E.get("progs_propios")
     con9 = lambda p: [(g, _NOVENA.get(q, q)) for g, q in p] if novena else p
     prog = con9(progs[rng.integers(len(progs))])
+    escala = str(rng.choice(E["escalas"])) if E.get("escalas") else None
     acordes = _acordes_de(prog, tonica)
     bpm_min, bpm_max = E.get("bpm", (60, 92))
     sw_min, sw_max = E.get("sw", (.06, .2))
@@ -618,6 +647,8 @@ def tema_aleatorio(seed, estilo="aleatorio"):
         texVol=float(rng.uniform(.2, 1.3)),
         intro_filtro=bool(rng.random() < E.get("intro", .4)),
         **({"break": True} if rng.random() < E.get("break", .25) else {}),
+        **({"escala": escala} if escala else {}),
+        **({"bonsho": True} if rng.random() < E.get("bonsho", 0) else {}),
     )
     if tema["inst"] == "pad" and tema["comp"] in ("stabs", "charleston", "roto"):
         tema["comp"] = "pad"   # un pad no se toca a golpes cortos
@@ -630,7 +661,7 @@ def tema_aleatorio(seed, estilo="aleatorio"):
         while tn < 60:
             tn += 12
         tema["tonica"] = tn
-    tema["mel"] = _mel_aleatoria(rng, tonica, acordes, menor, elige("densidad"))
+    tema["mel"] = _mel_aleatoria(rng, tonica, acordes, menor, elige("densidad"), ESCALAS.get(escala))
     tema["raiz"] = tonica   # para poder componer otra melodía sobre los mismos acordes (radio infinita)
     return tema
 
@@ -638,7 +669,7 @@ def tema_aleatorio(seed, estilo="aleatorio"):
 # ── radio infinita: tramos encadenados que cambian poco a poco ──
 
 _GRUPOS = {   # parámetros que viajan juntos al pasar de un tramo al siguiente
-    "armonia": ("modo", "acordes", "acordesB", "mel", "guino", "tonica", "raiz"),
+    "armonia": ("modo", "acordes", "acordesB", "mel", "guino", "tonica", "raiz", "escala", "bonsho"),
     "inst": ("inst",), "instMel": ("instMel",), "bat": ("bat", "kit", "break"), "bajo": ("bajo", "bajoTimbre"),
     "comp": ("comp",), "tex": ("tex", "texVol"), "sala": ("sala",), "lofi": ("lofi",), "niveles": ("niveles",),
 }
@@ -680,7 +711,7 @@ def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None):
         T["sin_armonia"] = 0 if "armonia" in cambios else sin_armonia
         if "armonia" not in cambios and rng.random() < .7:   # otra melodía sobre los mismos acordes
             dens = str(rng.choice(E.get("densidad", TODOS["densidad"])))
-            T["mel"] = _mel_aleatoria(rng, T["raiz"], T["acordes"], T["modo"] == "menor", dens)
+            T["mel"] = _mel_aleatoria(rng, T["raiz"], T["acordes"], T["modo"] == "menor", dens, ESCALAS.get(T.get("escala")))
         if T["inst"] == "pad" and T["comp"] in ("stabs", "charleston", "roto"):
             T["comp"] = "pad"
         if "bat" in cambios or "armonia" in cambios:
