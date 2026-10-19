@@ -274,6 +274,8 @@ RITMOS = {
     "doble":   {"K": "x.x...x.", "S": "..x..rx.", "H": "x.xxx.x."},
     "nada":    {"K": "........", "S": "........", "H": "........"},
     "templo":  {"K": "........", "S": "........", "H": "........", "W": "x.....x."},   # W = bloque de madera
+    "bossa":   {"K": "x..x..x.", "S": "..r.r..r", "H": "x.x.x.x."},
+    "balada":  {"K": "x.....x.", "S": "....x...", "H": "x.x.x.x."},
 }
 
 # ── las texturas (bucle de ruido de fondo, como el buffer de la referencia) ──
@@ -463,6 +465,7 @@ _QUAL = {"maj7": (0, 4, 7, 11), "m7": (0, 3, 7, 10), "7": (0, 4, 7, 10),
          "5": (0, 7, 12), "sus2": (0, 2, 7), "sus4": (0, 5, 7)}   # abiertos, para el templo
 ESCALAS = {   # pentatónicas japonesas (semitonos desde la tónica)
     "hirajoshi": (0, 2, 3, 7, 8), "insen": (0, 1, 5, 7, 10), "yo": (0, 2, 5, 7, 9),
+    "blues": (0, 3, 5, 6, 7, 10),
 }
 _PROGS_MENOR = [   # en menor natural (semitonos desde la tónica)
     [(0, "m7"), (8, "maj7"), (3, "maj7"), (10, "7")],       # i-VI-III-VII
@@ -578,6 +581,39 @@ ESTILOS = {
                      bpm=(54, 62), sw=(.04, .1), menor=.85, inst=["pad", "rhodes", "guitarra"],
                      instMel=["flauta", "saxo", "clarinete", "campana"], bat=["nada", "suave"], bajo=["largo"], tex=["cinta"],
                      comp=["pad", "arpegio"], densidad=["escasa"], guino=0, sala=(.25, .5)),
+    # siete más (2026-10-19) para completar la cuadrícula del panel a 16
+    "bossa": dict(nombre="Bossa nova", desc="Aire brasileño: guitarra con acordes de novena, ritmo de bossa, flauta o saxo.",
+                  bpm=(76, 88), sw=(.04, .1), menor=.35, novena=.85, inst=["guitarra", "guitarra", "piano"],
+                  instMel=["flauta", "saxo", "vibra", "guitarra"], bat=["bossa", "bossa", "suave"], bajo=["rebote", "largo"],
+                  tex=["vinilo"], comp=["charleston", "roto", "arpegio"], densidad=["normal", "escasa"], guino=0, sala=(.08, .25)),
+    "soul": dict(nombre="Neo soul", desc="Rhodes con novenas, ritmo dilla perezoso y trompeta con sordina.",
+                 bpm=(66, 80), sw=(.14, .22), menor=.55, novena=.95, inst=["rhodes", "rhodes", "pad"],
+                 instMel=["rhodes", "vibra", "trompeta", "saxo"], bat=["dilla", "perezoso", "boombap"], bajo=["largo", "rebote"],
+                 tex=["vinilo", "cinta"], comp=["largo", "stabs", "roto"], densidad=["normal"], guino=0, sala=(.1, .3), partB=.7),
+    "cafe": dict(nombre="Café de mañana", desc="Luminoso y en mayor: piano o guitarra, clarinete, ritmo ligero.",
+                 bpm=(74, 86), sw=(.08, .14), menor=.12, inst=["piano", "guitarra", "rhodes"],
+                 instMel=["piano", "clarinete", "flauta", "vibra"], bat=["suave", "medio", "balada"], bajo=["rebote", "largo"],
+                 tex=["vinilo"], comp=["arpegio", "largo", "charleston"], densidad=["normal", "densa"], guino=0, sala=(.1, .3)),
+    "invierno": dict(nombre="Invierno", desc="Frío y quieto: pads y vibráfono, campanas lejanas, mucha sala.",
+                     bpm=(56, 68), sw=(.02, .08), menor=.65, inst=["pad", "vibra", "piano"],
+                     instMel=["campana", "vibra", "flauta", "cuenco"], bat=["suave", "nada", "balada"], bajo=["largo"],
+                     tex=["cinta", "vinilo"], comp=["pad", "arpegio", "largo"], densidad=["escasa"], guino=0, intro=.6, sala=(.35, .6)),
+    "neon": dict(nombre="Neón", desc="Noche de ciudad con sintes: pads, pulsos, bajo de sinte y saxo.",
+                 bpm=(82, 96), sw=(.06, .12), menor=.75, inst=["pad", "pulso", "pad"], instMel=["pulso", "saxo", "vibra", "pulso"],
+                 bat=["boombap", "doble", "roto"], bajo=["rebote", "largo"], bajoTimbre=["sinte", "sub"], tex=["cinta"],
+                 comp=["stabs", "arpegio", "pad"], densidad=["normal"], guino=0, sala=(.05, .2)),
+    "bosque": dict(nombre="Bosque", desc="Naturaleza: guitarra y koto arpegiados, flauta, pentatónica mayor, lluvia suave.",
+                   bpm=(60, 72), sw=(.04, .1), menor=.2, inst=["guitarra", "koto", "pad"],
+                   instMel=["flauta", "shakuhachi", "campana", "guitarra"], bat=["nada", "suave", "templo"], bajo=["largo"],
+                   tex=["lluvia"], comp=["arpegio", "arpegio", "largo"], densidad=["escasa", "normal"], guino=0,
+                   escalas=["yo"], sala=(.25, .5)),
+    "blues": dict(nombre="Blues lento", desc="Doce compases de séptimas con swing, guitarra, saxo y bajo caminante.",
+                  bpm=(60, 74), sw=(.2, .28), menor=.1, inst=["guitarra", "piano", "rhodes"],
+                  instMel=["saxo", "guitarra", "trompeta", "piano"], bat=["shuffle", "perezoso", "boombap"],
+                  bajo=["caminante", "rebote"], tex=["vinilo"], comp=["roto", "charleston", "stabs"], densidad=["normal"],
+                  guino=0, escalas=["blues"], sala=(.08, .25),
+                  progs_propios=[[(0, "7"), (5, "7"), (0, "7"), (7, "7")], [(0, "7"), (0, "7"), (5, "7"), (0, "7")],
+                                 [(5, "7"), (0, "7"), (7, "7"), (0, "7")]]),
 }
 
 
