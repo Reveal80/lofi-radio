@@ -1307,6 +1307,7 @@ function cerrarLogs() { $("logs").classList.remove("open"); $("logbtn").classLis
 let statsTimer = null;
 const fmtB = b => b < 1024 ? b + " B" : b < 1048576 ? (b / 1024).toFixed(0) + " KB" : b < 1073741824 ? (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + " MB" : (b / 1073741824).toFixed(b < 10737418240 ? 2 : 1) + " GB";
 const fmtKbps = k => k >= 1000 ? (k / 1000).toFixed(2) + " Mbit/s" : k + " kbit/s";
+const fmtMBs = k => { const b = k * 1000 / 8; return b >= 1048576 ? (b / 1048576).toFixed(2) + " MB/s" : (b / 1024).toFixed(0) + " KB/s"; };   // kbit/s → bytes/s
 const fmtDur = s => { s = Math.max(0, Math.round(s)); const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60); return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`; };
 function sxBar(id, pct) { const i = $(id); pct = Math.max(0, Math.min(100, pct || 0)); i.style.width = pct + "%"; i.className = pct >= 90 ? "bad" : pct >= 70 ? "warn" : ""; }
 function pintarStats(x) {
@@ -1320,9 +1321,9 @@ function pintarStats(x) {
   sxBar("sx-c-mem-b", c.mem / c.mem_limite * 100);
   $("sx-c-mem-d").textContent = `+ ${fmtB(c.mem_cache)} caché · límite ${fmtB(c.mem_limite)}`;
   $("sx-c-info").textContent = `${c.procesos} procesos · activo ${fmtDur(c.uptime)}`;
-  $("sx-tx").textContent = fmtKbps(r.tx_kbps);
+  $("sx-tx").textContent = fmtMBs(r.tx_kbps);
   sxBar("sx-tx-b", e.running ? r.tx_kbps / ((e.kbps + 160) * (e.mode === "directo" ? 2 : 1)) * 100 : 0);
-  $("sx-tx-d").textContent = `bajada ${fmtKbps(r.rx_kbps)} · ${fmtB(r.tx_total)} enviados en total`;
+  $("sx-tx-d").textContent = `${fmtKbps(r.tx_kbps)} · bajada ${fmtMBs(r.rx_kbps)} · ${fmtB(r.tx_total)} enviados en total`;
   const ff = e.ffmpeg;
   if (e.running && ff) {
     $("sx-ff").innerHTML = `${ff.fps.toFixed(0)}<small>fps</small> · ${ff.velocidad.toFixed(2)}<small>x</small>`;
