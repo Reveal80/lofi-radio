@@ -115,9 +115,10 @@ def _render_worker(req, res):
         item = req.get()
         if item is None:
             return
-        rid, prev, estilo, bpm, fondo, quitar, anadir, melodia, seed = item
+        rid, prev, estilo, bpm, fondo, opc, seed = item
         try:
-            tema = lofigen.tema_siguiente(prev, seed, estilo, bpm or None, quitar, anadir, melodia)
+            tema = lofigen.tema_siguiente(prev, seed, estilo, bpm or None, tuple(opc.get("quitar", ())), tuple(opc.get("anadir", ())),
+                                          int(opc.get("melodia", 1)), False)
             cuerpo, cola = lofigen.render_theme(tema, 1, seed, continuo=True, fondo=fondo)
             res.put((rid, tema, cuerpo.astype(np.float32), cola.astype(np.float32)))
         except Exception as e:   # un tramo fallido no tumba la radio: se pide otro
@@ -148,11 +149,11 @@ class RadioInfinita:
         self.proc = None
         self.tema = None
 
-    def pedir(self, estilo, bpm, fondo=0, inst=((), (), 1)):
+    def pedir(self, estilo, bpm, fondo=0, opc=None):
         self.arrancar()
         self.rid += 1
         self.seed += 1
-        self.req.put((self.rid, self.tema, estilo, int(bpm or 0), float(fondo), tuple(inst[0]), tuple(inst[1]), int(inst[2]), self.seed))
+        self.req.put((self.rid, self.tema, estilo, int(bpm or 0), float(fondo), dict(opc or {}), self.seed))
 
     def recoger(self, timeout=0):
         """El tramo de la última petición si ya está (tema, cuerpo, cola); None si no."""
@@ -200,19 +201,46 @@ def tocar_infinita(cfg):
     con varios estilos marcados, el estilo rota cada rotar_min minutos al empezar un tramo."""
     global cola_pendiente
     import numpy as np
+    nombres = {}
+    NOMBRES_INST = []
+    try:
+        import lofigen
+        nombres = {k: e["nombre"] for k, e in lofigen.ESTILOS.items()}
+        NOMBRES_INST = list(lofigen.INST_NOMBRES)
+    except Exception:
+        pass
     radio = RadioInfinita()
     estilo, desde = _elegir_estilo(cfg, None, 0, False)
     bpm = int(cfg.get("bpm") or 0)
     fondo = lambda c: .35 if c.get("textura") else 0   # textura de fondo opcional, y baja
-    inst = lambda c: (tuple(c.get("inst_quitar") or ()), tuple(c.get("inst_anadir") or ()), int(c.get("melodia", 1)))
+    AZAR_MIN = 30                                      # el aleatorio de instrumentos/melodía cambia cada 30 min
+    azar = {"inst": (None, 0), "mel": (None, 0)}       # (elección, hasta cuándo vale)
+    def inst(c):
+        """Opciones para el compositor. Con «Aleatorio» se sortea una combinación y se mantiene 30 minutos."""
+        quitar, anadir = tuple(c.get("inst_quitar") or ()), tuple(c.get("inst_anadir") or ())
+        melodia = int(c.get("melodia", 1))
+        ahora = time.time()
+        if c.get("inst_aleatorio"):
+            eleccion, hasta = azar["inst"]
+            if eleccion is None or ahora >= hasta:
+                posibles = [k for k in NOMBRES_INST if k not in quitar] or list(NOMBRES_INST)
+                eleccion = tuple(sorted(random.sample(posibles, min(len(posibles), random.randint(2, 4)))))
+                azar["inst"] = (eleccion, ahora + AZAR_MIN * 60)
+            quitar = tuple(k for k in NOMBRES_INST if k not in eleccion)   # solo suenan los sorteados
+            anadir = eleccion
+        else:
+            azar["inst"] = (None, 0)
+        if c.get("melodia_aleatoria"):
+            nivel, hasta = azar["mel"]
+            if nivel is None or ahora >= hasta:
+                nivel = random.choice([0, 1, 1, 2, 2, 3])
+                azar["mel"] = (nivel, ahora + AZAR_MIN * 60)
+            melodia = nivel
+        else:
+            azar["mel"] = (None, 0)
+        return {"quitar": quitar, "anadir": anadir, "melodia": melodia}
     radio.pedir(estilo, bpm, fondo(cfg), inst(cfg))
     paso = SR // 10                                    # 0,1 s por escritura
-    nombres = {}
-    try:
-        import lofigen
-        nombres = {k: e["nombre"] for k, e in lofigen.ESTILOS.items()}
-    except Exception:
-        pass
     fon, ins = fondo(cfg), inst(cfg)
     siguiente = None                                   # tramo ya recogido que entra en el corte
     try:
@@ -250,6 +278,9 @@ def tocar_infinita(cfg):
                                           "tex": tema.get("tex"), "cambios": tema.get("cambios", []),
                                           "siguiente": estilo_sig if estilo_sig != estilo else None,
                                           "mezcla": "+" in estilo,
+                                          "azar_inst": list(azar["inst"][0] or []), "azar_inst_hasta": azar["inst"][1],
+                                          "azar_mel": azar["mel"][0], "azar_mel_hasta": azar["mel"][1],
+                                          "melodia": ins["melodia"],
                                           "rota_en": (desde + rotar_min * 60) if len(estilos) > 1 and "+" not in estilo else 0}})
             estilo, desde = estilo_sig, desde_sig
             pos, ultimo, corte_en, nuevo = 0, time.time(), None, None

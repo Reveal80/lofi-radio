@@ -400,6 +400,8 @@
   .infpanel .escenas { grid-template-columns: repeat(8, 1fr); }
   .inf-inst { display: flex; align-items: flex-start; gap: 10px; font-size: 12.5px; color: var(--muted); }
   .inf-inst > span { padding-top: 3px; white-space: nowrap; }
+  .chip.rnd { margin-left: auto; cursor: pointer; opacity: 1 !important; text-decoration: none !important; flex: none; }
+  .chip.rnd.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
   .inf-inst .chips { display: flex; flex-wrap: wrap; gap: 5px; }
   .inf-inst .chip { cursor: pointer; opacity: .4; text-decoration: line-through; transition: all .15s; }
   .inf-inst .chip:hover { opacity: .8; }
@@ -789,8 +791,8 @@
           <div class="ih"><b>Radio infinita</b><span>la música se compone sola mientras suena. Marca uno o varios estilos (con varios, va rotando) y el tempo; los cambios entran en el siguiente compás</span><small id="inf-now"></small></div>
           <div class="escenas" id="inf-estilos"></div>
           <div class="inf-rota" id="inf-rota" hidden><span>Con varios estilos:</span><button class="chip" data-min="0" title="Un solo estilo que suma los marcados: instrumentos, ritmos y tempos de todos ellos">Mezclar</button><span style="color:var(--dim)">o cambiar cada</span><button class="chip" data-min="15">15 min</button><button class="chip" data-min="30">30 min</button><button class="chip" data-min="60">1 h</button><button class="chip" data-min="120">2 h</button><button class="chip" data-min="240">4 h</button><small id="inf-rota-txt"></small></div>
-          <div class="inf-inst"><span title="Los del estilo van marcados; pulsa uno para quitarlo o para añadir otro. Entra en el siguiente tramo">Instrumentos</span><div class="chips" id="inf-inst-chips"></div></div>
-          <div class="inf-rota" id="inf-mel"><span title="Cuántos compases llevan melodía; el resto son acordes y bajo">Melodía</span><button class="chip" data-mel="0">ninguna</button><button class="chip" data-mel="1">de vez en cuando</button><button class="chip" data-mel="2">normal</button><button class="chip" data-mel="3">continua</button></div>
+          <div class="inf-inst"><span title="Los del estilo van marcados; pulsa uno para quitarlo o para añadir otro. Entra en el siguiente tramo">Instrumentos</span><div class="chips" id="inf-inst-chips"></div><button class="chip rnd" id="inf-inst-rnd" onclick="alternarAzar('inst_aleatorio')" title="Sortea una combinación de 2 a 4 instrumentos (sin los que hayas quitado) y cambiará cada 30 minutos"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>Aleatorio</button></div>
+          <div class="inf-rota" id="inf-mel"><span title="Cuántos compases llevan melodía; el resto son acordes y bajo">Melodía</span><button class="chip" data-mel="0">ninguna</button><button class="chip" data-mel="1">de vez en cuando</button><button class="chip" data-mel="2">normal</button><button class="chip" data-mel="3">continua</button><button class="chip rnd" id="inf-mel-rnd" onclick="alternarAzar('melodia_aleatoria')" title="Sortea un nivel de melodía y cambiará cada 30 minutos"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>Aleatorio</button></div>
           <div class="inf-tempo">
             <span>Tempo</span><span class="lim">50</span>
             <input type="range" id="inf-bpm" min="50" max="110" step="1" value="76" aria-label="tempo en bpm">
@@ -1971,14 +1973,21 @@ function pintarInfinita(d, estilos) {
     : i?.rota_en && sel.size > 1 ? `ahora ${nom(i.estilo)} · luego ${nom(i.siguiente || sig(d.estilos, i.estilo))} en ${Math.max(0, Math.ceil((i.rota_en - Date.now() / 1000) / 60))} min` : "";
   $("inf-auto").classList.toggle("on", !d.bpm);
   $("inf-tex").classList.toggle("on", !!d.textura);
-  document.querySelectorAll("#inf-mel .chip").forEach(c => c.classList.toggle("on", +c.dataset.mel === (d.melodia ?? 1)));
+  const minutos = h => h ? `cambiará en ${Math.max(0, Math.ceil((h - Date.now() / 1000) / 60))} min` : "cambiará cada 30 minutos";
+  const nivelMel = d.melodia_aleatoria ? (i?.azar_mel ?? null) : (d.melodia ?? 1);
+  document.querySelectorAll("#inf-mel .chip[data-mel]").forEach(c => c.classList.toggle("on", +c.dataset.mel === nivelMel));
+  $("inf-mel-rnd").classList.toggle("on", !!d.melodia_aleatoria);
+  $("inf-mel-rnd").title = d.melodia_aleatoria ? `Melodía al azar: ${minutos(i?.azar_mel_hasta)}. Pulsa para volver al nivel fijo` : "Sortea un nivel de melodía y cambiará cada 30 minutos";
+  $("inf-inst-rnd").classList.toggle("on", !!d.inst_aleatorio);
+  $("inf-inst-rnd").title = d.inst_aleatorio ? `Instrumentos al azar: ${minutos(i?.azar_inst_hasta)}. Pulsa para volver a los del estilo` : "Sortea una combinación de 2 a 4 instrumentos (sin los que hayas quitado) y cambiará cada 30 minutos";
   // instrumentos: los del estilo (más los añadidos, menos los quitados); los que suenan ahora, en verde
   const chips = $("inf-inst-chips");
   if (!chips.childElementCount && d.instrumentos)
     chips.innerHTML = Object.entries(d.instrumentos).map(([k, n]) => `<button class="chip" data-inst="${esc(k)}">${esc(n)}</button>`).join("");
-  const quitar = new Set(d.inst_quitar || []), anadir = new Set(d.inst_anadir || []), base = new Set(d.inst_estilo || []);
+  const quitar = new Set(d.inst_quitar || []), anadir = new Set(d.inst_anadir || []);
+  const base = new Set(d.inst_aleatorio ? (i?.azar_inst?.length ? i.azar_inst : Object.keys(d.instrumentos || {})) : (d.inst_estilo || []));
   const suena = new Set([i?.inst, i?.instMel].filter(Boolean));
-  chips.querySelectorAll(".chip").forEach(c => {
+  chips.querySelectorAll(".chip[data-inst]").forEach(c => {
     const k = c.dataset.inst, on = (base.has(k) || anadir.has(k)) && !quitar.has(k);
     c.classList.toggle("on", on); c.classList.toggle("extra", on && anadir.has(k) && !base.has(k)); c.classList.toggle("suena", suena.has(k));
     c.title = suena.has(k) ? "suena ahora · pulsa para quitarlo" : on ? (anadir.has(k) && !base.has(k) ? "añadido por ti · pulsa para quitarlo" : "lo usa el estilo · pulsa para quitarlo") : "no suena · pulsa para añadirlo";
@@ -2011,15 +2020,20 @@ $("inf-estilos").addEventListener("click", e => {
   ajustarInfinita({estilos: lista}, sel.has(k) ? (lista.length > 1 ? `${nombre} añadido a la rotación` : `Cambiando a ${nombre}: entra en el siguiente compás`) : `${nombre} quitado de la rotación`);
 });
 $("inf-inst-chips").addEventListener("click", e => {
-  const c = e.target.closest(".chip"); if (!c || !infinita) return;
+  const c = e.target.closest(".chip[data-inst]"); if (!c || !infinita) return;
   const k = c.dataset.inst, on = c.classList.contains("on");
   const quitar = new Set(infinita.inst_quitar || []), anadir = new Set(infinita.inst_anadir || []);
   if (on) { anadir.delete(k); quitar.add(k); } else { quitar.delete(k); anadir.add(k); }
-  ajustarInfinita({inst_quitar: [...quitar], inst_anadir: [...anadir]}, `${c.textContent} ${on ? "quitado" : "añadido"}: entra en el siguiente tramo`);
+  ajustarInfinita({inst_quitar: [...quitar], inst_anadir: [...anadir], inst_aleatorio: false}, `${c.textContent} ${on ? "quitado" : "añadido"}: entra en el siguiente tramo`);
 });
+function alternarAzar(k) {
+  const on = !infinita?.[k];
+  ajustarInfinita({[k]: on}, k === "inst_aleatorio" ? (on ? "Instrumentos al azar: cualquiera puede sonar" : "Instrumentos según el estilo")
+                                                  : (on ? "Melodía al azar: cada tramo con un nivel distinto" : "Melodía con nivel fijo"));
+}
 $("inf-mel").addEventListener("click", e => {
-  const c = e.target.closest(".chip"); if (!c) return;
-  ajustarInfinita({melodia: +c.dataset.mel}, `Melodía: ${c.textContent} (entra en el siguiente tramo)`);
+  const c = e.target.closest(".chip[data-mel]"); if (!c) return;
+  ajustarInfinita({melodia: +c.dataset.mel, melodia_aleatoria: false}, `Melodía: ${c.textContent} (entra en el siguiente tramo)`);
 });
 $("inf-rota").addEventListener("click", e => {
   const c = e.target.closest(".chip"); if (!c) return;

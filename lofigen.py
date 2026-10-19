@@ -634,11 +634,12 @@ def instrumentos_de(estilos):
     return [k for k in INST_NOMBRES if k in usados]
 
 
-def con_instrumentos(E, quitar=(), anadir=()):
-    """Copia del estilo con los instrumentos que el usuario quita o añade (acordes y melodía)."""
+def con_instrumentos(E, quitar=(), anadir=(), todos=False):
+    """Copia del estilo con los instrumentos que el usuario quita o añade (acordes y melodía).
+    todos=True (botón «Aleatorio»): cualquiera de INST_NOMBRES, sin atender al estilo."""
     E = dict(E)
     for k in ("inst", "instMel"):
-        base = E.get(k, TODOS[k])
+        base = list(INST_NOMBRES) if todos else E.get(k, TODOS[k])
         lista = [x for x in base if x not in quitar] + [x for x in anadir if x not in base and x in INST_NOMBRES]
         E[k] = lista or [x for x in TODOS[k] if x not in quitar] or list(TODOS[k])
     return E
@@ -742,12 +743,12 @@ _ACOTADOS = ("inst", "instMel", "bat", "bajo", "tex", "comp")   # listas que cad
 MELODIA = {0: (0, 0), 1: (2, 3), 2: (4, 5), 3: (12, 12)}   # nivel → (mín, máx) compases con melodía de los 12 de A/B
 
 
-def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None, quitar=(), anadir=(), melodia=1):
+def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None, quitar=(), anadir=(), melodia=1, inst_todos=False):
     """Compone el tramo siguiente de la radio infinita: hereda casi todo del anterior y cambia
     uno o dos grupos de parámetros. Si el estilo pedido no admite algo del tramo anterior
     (instrumento, batería…), lo va acercando al estilo de dos en dos cosas por tramo, así el
     cambio de estilo se nota poco a poco. bpm fijo si se da; si no, deriva dentro del estilo."""
-    E = con_instrumentos(estilo_de(estilo), quitar, anadir)
+    E = con_instrumentos(estilo_de(estilo), quitar, anadir, inst_todos)
     rng = np.random.default_rng(seed)
     nuevo = tema_aleatorio(int(rng.integers(1 << 30)), estilo, E)
     if prev is None:
