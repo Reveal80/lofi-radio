@@ -444,7 +444,7 @@ def _pref(rng, preferidos, admitidos, evitar=()):
     return str(rng.choice(base))
 
 
-def componer(seed, estilo="aleatorio", E=None, variedad="medio", bpm=0, melodia=1, prev=None, continuar=False, perfil=None):
+def componer(seed, estilo="aleatorio", E=None, variedad="medio", bpm=0, melodia=1, prev=None, continuar=False, perfil=None, capas=3):
     """Compone una pieza entera (sin renderizar): identidad, armonía con voicings, motivos y plan
     de secciones. prev: pieza anterior (para la continuidad de tempo y tonalidad); continuar=True
     (cambio pedido por el usuario) conserva tempo y tonalidad y acorta la intro."""
@@ -489,9 +489,12 @@ def componer(seed, estilo="aleatorio", E=None, variedad="medio", bpm=0, melodia=
     # instrumentación: preferencias del perfil dentro de lo que admite el estilo (y el usuario)
     inst = _pref(rng, P["inst"], E.get("inst", L.TODOS["inst"]))
     instMel = _pref(rng, P["instMel"], E.get("instMel", L.TODOS["instMel"]), evitar=(inst,))
+    # capas: cuántos instrumentos a la vez (2 acordes+melodía, 3 +notas guía, 4 +arpegio/contracanto)
     admitidos = set(E.get("inst", L.TODOS["inst"])) | set(E.get("instMel", L.TODOS["instMel"]))
-    capa_opts = [x for x in P["capa"] if x not in (inst, instMel) and x in admitidos]
-    capa = str(rng.choice(capa_opts)) if capa_opts and rng.random() < .85 else None
+    capa_opts = [x for x in P["capa"] + list(admitidos) if x not in (inst, instMel) and x in admitidos and x in L.INST]
+    capa = str(rng.choice(capa_opts[:3])) if capa_opts and capas >= 3 else None
+    inst2_opts = [x for x in P["inst"] + P["instMel"] + list(admitidos) if x not in (inst, instMel, capa, "pad") and x in admitidos and x in L.INST]
+    inst2 = str(rng.choice(inst2_opts[:3])) if inst2_opts and capas >= 4 else None
     groove = _pref(rng, P["grooves"], E.get("bat", L.TODOS["bat"]))
     comp = _pref(rng, P["comp"], E.get("comp", L.TODOS["comp"]))
     if inst == "pad" and comp in ("stabs", "charleston", "roto", "ostinato", "bossa"):
@@ -548,7 +551,7 @@ def componer(seed, estilo="aleatorio", E=None, variedad="medio", bpm=0, melodia=
     pieza = dict(
         seed=int(seed), estilo=estilo, perfil=perfil, perfil_nombre=P["nombre"], variedad=variedad,
         bpm=tempo, sw=sw, tonica=tonica, modo="menor" if menor else "mayor", tono=_nombre_tono(tonica, menor),
-        inst=inst, instMel=instMel, instMelB=instMelB, capa=capa, bat=groove, comp=comp, bajo=bajo, bajoTimbre=bajoTimbre,
+        inst=inst, instMel=instMel, instMelB=instMelB, capa=capa, inst2=inst2, capas=int(capas), bat=groove, comp=comp, bajo=bajo, bajoTimbre=bajoTimbre,
         kit=T["kit"], lofi=lofi, graves=T.get("graves", 0), bajoNivel=T.get("bajoNivel", 1), bajoGrave=bool(T.get("bajoGrave")),
         sala=sala, niveles=T["niveles"], tex=T["tex"], texVol=T.get("texVol", 1), bonsho=bool(T.get("bonsho")),
         familia=familia, progA=progA, progB=progB, idA=idA, idB=idB, acordes=acordes, esc=esc, centro_idx=centro_idx,
@@ -606,13 +609,13 @@ class Compositor:
             except Exception:
                 pass
 
-    def nueva(self, estilo, E, variedad, bpm, melodia, seed, continuar=False):
+    def nueva(self, estilo, E, variedad, bpm, melodia, seed, continuar=False, capas=3):
         """Elige entre varias piezas candidatas la que menos se parezca a las recientes."""
         V = VARIEDAD.get(variedad, VARIEDAD["medio"])
         rng = np.random.default_rng(seed)
         mejor = None
         for k in range(V["candidatos"]):
-            p = componer(int(rng.integers(1 << 30)), estilo, E, variedad, bpm, melodia, self.pieza, continuar)
+            p = componer(int(rng.integers(1 << 30)), estilo, E, variedad, bpm, melodia, self.pieza, continuar, None, capas)
             s = similitud(huella(p), self.recientes)
             if mejor is None or s < mejor[0]:
                 mejor = (s, p)
@@ -622,7 +625,7 @@ class Compositor:
         self._guardar()
         self.n += 1
         p["n"] = self.n
-        p["clave"] = (estilo, tuple(E.get("inst", ())), tuple(E.get("instMel", ())), bool(E.get("solo_melodia")))
+        p["clave"] = (estilo, tuple(E.get("inst", ())), tuple(E.get("instMel", ())), bool(E.get("solo_melodia")), capas)
         self.pieza, self.idx, self.segundos = p, 0, 0.0
         return p
 
@@ -631,7 +634,8 @@ class Compositor:
         E = L.con_instrumentos(L.estilo_de(estilo), tuple(opc.get("quitar", ())), tuple(opc.get("anadir", ())), False)
         variedad = str(opc.get("variedad", "medio"))
         melodia = int(opc.get("melodia", 1))
-        clave = (estilo, tuple(E.get("inst", ())), tuple(E.get("instMel", ())), bool(E.get("solo_melodia")))
+        capas = int(opc.get("capas", 3))
+        clave = (estilo, tuple(E.get("inst", ())), tuple(E.get("instMel", ())), bool(E.get("solo_melodia")), capas)
         p = self.pieza
         if opc.get("rehacer") and self.ultimo and p is not None:   # la misma sección otra vez con ajustes nuevos (melodía…)
             self.idx, self.segundos = self.ultimo
@@ -652,7 +656,7 @@ class Compositor:
                 cierre = [s for s in p["secciones"] if s["tipo"] == "cierre"]
                 p["secciones"] = p["secciones"][:self.idx] + cierre
         if nueva:
-            p = self.nueva(estilo, E, variedad, bpm, melodia, seed, continuar)
+            p = self.nueva(estilo, E, variedad, bpm, melodia, seed, continuar, capas)
         S = p["secciones"][self.idx]
         self.ultimo = (self.idx, self.segundos)
         cuerpo, cola = render_seccion(p, S, seed, fondo)
@@ -663,7 +667,7 @@ class Compositor:
                     tex=p["tex"], solo_melodia=p["solo"], cambios=[],
                     pieza=dict(n=p["n"], perfil=p["perfil"], perfil_nombre=p["perfil_nombre"], tono=p["tono"], variedad=p["variedad"],
                                dur=round(p["dur"], 1), antes=round(antes, 1), seccion=S["nombre"], idx=self.idx, total=len(p["secciones"]),
-                               forma=p["forma"], capa=p["capa"], comp=p["comp"], bajo=p["bajo"], familia=p["familia"],
+                               forma=p["forma"], capa=p["capa"], inst2=p.get("inst2"), comp=p["comp"], bajo=p["bajo"], familia=p["familia"],
                                parecido=p.get("parecido", 0)))
         return info, cuerpo, cola
 
@@ -747,6 +751,12 @@ def render_seccion(p, S, seed, fondo=0.0):
             capa_prev = m
             if c % 2 == 0 or rng.random() < .5:
                 L.tocar_nota(resto, capa, m, cuando(0) + corchea * (0 if c % 2 == 0 else 3), negra * 3.2, .03, cinta)
+        # ── cuarto instrumento: arpegio suave una octava arriba (en B, en las A repetidas y en el descanso) ──
+        if p.get("inst2") and (S["capa"] or S["tipo"] in ("B", "descanso")) and not solo and not final_pieza:
+            arp = [m + 12 for m in notas[:4]]
+            patron = (0, 2, 3, 5, 6) if S["tipo"] != "descanso" else (0, 4)
+            for j, i in enumerate(patron):
+                L.tocar_nota(resto, p["inst2"], arp[(j + c) % len(arp)], cuando(i) + humano(.005), corchea * 1.6, .03 * (1 + humano(.08)), cinta)
         # ── bajo ──
         if S["bajo"] and c >= S["bajo_desde"] and not solo and not final_pieza:
             r = raiz - 12

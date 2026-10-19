@@ -242,7 +242,8 @@ def tocar_infinita(cfg):
             melodia = nivel
         else:
             azar["mel"] = (None, 0)
-        return {"quitar": quitar, "anadir": anadir, "melodia": melodia, "variedad": str(c.get("variedad") or "medio")}
+        return {"quitar": quitar, "anadir": anadir, "melodia": melodia, "variedad": str(c.get("variedad") or "medio"),
+                "capas": int(c.get("capas") or 3)}
     radio.pedir(estilo, bpm, fondo(cfg), inst(cfg))
     paso = SR // 10                                    # 0,1 s por escritura
     fon, ins = fondo(cfg), inst(cfg)
