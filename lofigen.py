@@ -415,7 +415,8 @@ def render_theme(T, cycles, seed, continuo=False, fondo=1.0):
         if T.get("bonsho") and c % 8 == 0:   # campana de templo al empezar cada 8 compases
             tocar_nota(resto, "bonsho", T.get("raiz", 50) - 12, t, 5, .13)
         # el gancho: en A tal cual, en B una octava arriba y no siempre entero
-        if parte in ("A", "B") and T.get("mel"):
+        toca = T.get("mel_compases")   # None = en todos los compases de A/B (canciones de la biblioteca)
+        if parte in ("A", "B") and T.get("mel") and (toca is None or c in toca):
             frase = T["mel"][(c - 2) % len(T["mel"])]
             sube = 12 if parte == "B" and T.get("subeB", True) else 0
             for k, m in enumerate(frase):
@@ -738,7 +739,10 @@ _GRUPOS = {   # parámetros que viajan juntos al pasar de un tramo al siguiente
 _ACOTADOS = ("inst", "instMel", "bat", "bajo", "tex", "comp")   # listas que cada estilo restringe
 
 
-def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None, quitar=(), anadir=()):
+MELODIA = {0: (0, 0), 1: (2, 3), 2: (4, 5), 3: (12, 12)}   # nivel → (mín, máx) compases con melodía de los 12 de A/B
+
+
+def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None, quitar=(), anadir=(), melodia=1):
     """Compone el tramo siguiente de la radio infinita: hereda casi todo del anterior y cambia
     uno o dos grupos de parámetros. Si el estilo pedido no admite algo del tramo anterior
     (instrumento, batería…), lo va acercando al estilo de dos en dos cosas por tramo, así el
@@ -780,6 +784,16 @@ def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None, quitar=(), anadir=(
             T["sw"] = nuevo["sw"]
         T["bpm"] = prev["bpm"]
     T.pop("guino", None)   # sin guiños de 8 bits en la radio infinita (al usuario le sonaban a videojuego)
+    # cuánta melodía: en qué compases de A/B (2..13) suena el gancho, en frases de dos compases.
+    # Por defecto «de vez en cuando»: el usuario se quejaba de que el gancho sonaba siempre y parecía el mismo
+    lo, hi = MELODIA.get(int(melodia), MELODIA[1])
+    k = int(rng.integers(lo, hi + 1))
+    if k >= 12:
+        T["mel_compases"] = list(range(2, 14))
+    else:
+        inicios = [2, 4, 6, 8, 10, 12]
+        elegidos = sorted(int(x) for x in rng.choice(inicios, size=min((k + 1) // 2, len(inicios)), replace=False))
+        T["mel_compases"] = sorted({c for i in elegidos for c in (i, i + 1)})[:max(k, 0)]
     # más armónico: la melodía no sube de dos octavas y una cuarta sobre la raíz, la parte B no
     # salta una octava, y fuera del retro no hay timbres percusivos en la melodía
     techo = T["raiz"] + 29

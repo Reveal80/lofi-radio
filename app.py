@@ -620,7 +620,7 @@ def api_aleatorio():
 # Radio infinita: música procedural compuesta en tiempo real en vez de la lista (audiofeeder.py).
 INFINITA_FILE = TRACKS_DIR / "infinita.json"
 INFINITA_DEF = {"activo": False, "estilos": ["aleatorio"], "rotar_min": 60, "bpm": 0, "textura": False,
-                "inst_quitar": [], "inst_anadir": []}   # bpm 0 = automático
+                "inst_quitar": [], "inst_anadir": [], "melodia": 1}   # bpm 0 = automático; melodia 0-3 (1 = de vez en cuando)
 ROTAR_MIN = (0, 15, 30, 60, 120, 240)   # 0 = mezclar los estilos marcados en vez de rotar
 
 
@@ -636,6 +636,7 @@ def estado_infinita(cfg=None):
     d["textura"] = bool(d.get("textura"))   # vinilo/lluvia de fondo; apagado por defecto (sonaba a ruido blanco)
     for k in ("inst_quitar", "inst_anadir"):
         d[k] = [x for x in (d.get(k) or []) if x in lofigen.INST_NOMBRES]
+    d["melodia"] = int(d["melodia"]) if str(d.get("melodia")).isdigit() and 0 <= int(d["melodia"]) <= 3 else 1
     d["inst_estilo"] = lofigen.instrumentos_de(d["estilos"])   # los que usarían los estilos marcados (informativo)
     d["instrumentos"] = lofigen.INST_NOMBRES
     return d
@@ -668,6 +669,10 @@ def api_infinita():
         d["rotar_min"] = int(data["rotar_min"])
     if "textura" in data:
         d["textura"] = bool(data["textura"])
+    if "melodia" in data:
+        if data["melodia"] not in (0, 1, 2, 3):
+            return jsonify(error="nivel de melodía no válido"), 400
+        d["melodia"] = int(data["melodia"])
     for k in ("inst_quitar", "inst_anadir"):
         if k in data:
             lista = data[k] or []

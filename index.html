@@ -790,6 +790,7 @@
           <div class="escenas" id="inf-estilos"></div>
           <div class="inf-rota" id="inf-rota" hidden><span>Con varios estilos:</span><button class="chip" data-min="0" title="Un solo estilo que suma los marcados: instrumentos, ritmos y tempos de todos ellos">Mezclar</button><span style="color:var(--dim)">o cambiar cada</span><button class="chip" data-min="15">15 min</button><button class="chip" data-min="30">30 min</button><button class="chip" data-min="60">1 h</button><button class="chip" data-min="120">2 h</button><button class="chip" data-min="240">4 h</button><small id="inf-rota-txt"></small></div>
           <div class="inf-inst"><span title="Los del estilo van marcados; pulsa uno para quitarlo o para añadir otro. Entra en el siguiente tramo">Instrumentos</span><div class="chips" id="inf-inst-chips"></div></div>
+          <div class="inf-rota" id="inf-mel"><span title="Cuántos compases llevan melodía; el resto son acordes y bajo">Melodía</span><button class="chip" data-mel="0">ninguna</button><button class="chip" data-mel="1">de vez en cuando</button><button class="chip" data-mel="2">normal</button><button class="chip" data-mel="3">continua</button></div>
           <div class="inf-tempo">
             <span>Tempo</span><span class="lim">50</span>
             <input type="range" id="inf-bpm" min="50" max="110" step="1" value="76" aria-label="tempo en bpm">
@@ -1970,6 +1971,7 @@ function pintarInfinita(d, estilos) {
     : i?.rota_en && sel.size > 1 ? `ahora ${nom(i.estilo)} · luego ${nom(i.siguiente || sig(d.estilos, i.estilo))} en ${Math.max(0, Math.ceil((i.rota_en - Date.now() / 1000) / 60))} min` : "";
   $("inf-auto").classList.toggle("on", !d.bpm);
   $("inf-tex").classList.toggle("on", !!d.textura);
+  document.querySelectorAll("#inf-mel .chip").forEach(c => c.classList.toggle("on", +c.dataset.mel === (d.melodia ?? 1)));
   // instrumentos: los del estilo (más los añadidos, menos los quitados); los que suenan ahora, en verde
   const chips = $("inf-inst-chips");
   if (!chips.childElementCount && d.instrumentos)
@@ -2014,6 +2016,10 @@ $("inf-inst-chips").addEventListener("click", e => {
   const quitar = new Set(infinita.inst_quitar || []), anadir = new Set(infinita.inst_anadir || []);
   if (on) { anadir.delete(k); quitar.add(k); } else { quitar.delete(k); anadir.add(k); }
   ajustarInfinita({inst_quitar: [...quitar], inst_anadir: [...anadir]}, `${c.textContent} ${on ? "quitado" : "añadido"}: entra en el siguiente tramo`);
+});
+$("inf-mel").addEventListener("click", e => {
+  const c = e.target.closest(".chip"); if (!c) return;
+  ajustarInfinita({melodia: +c.dataset.mel}, `Melodía: ${c.textContent} (entra en el siguiente tramo)`);
 });
 $("inf-rota").addEventListener("click", e => {
   const c = e.target.closest(".chip"); if (!c) return;

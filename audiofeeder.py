@@ -115,9 +115,9 @@ def _render_worker(req, res):
         item = req.get()
         if item is None:
             return
-        rid, prev, estilo, bpm, fondo, quitar, anadir, seed = item
+        rid, prev, estilo, bpm, fondo, quitar, anadir, melodia, seed = item
         try:
-            tema = lofigen.tema_siguiente(prev, seed, estilo, bpm or None, quitar, anadir)
+            tema = lofigen.tema_siguiente(prev, seed, estilo, bpm or None, quitar, anadir, melodia)
             cuerpo, cola = lofigen.render_theme(tema, 1, seed, continuo=True, fondo=fondo)
             res.put((rid, tema, cuerpo.astype(np.float32), cola.astype(np.float32)))
         except Exception as e:   # un tramo fallido no tumba la radio: se pide otro
@@ -148,11 +148,11 @@ class RadioInfinita:
         self.proc = None
         self.tema = None
 
-    def pedir(self, estilo, bpm, fondo=0, inst=((), ())):
+    def pedir(self, estilo, bpm, fondo=0, inst=((), (), 1)):
         self.arrancar()
         self.rid += 1
         self.seed += 1
-        self.req.put((self.rid, self.tema, estilo, int(bpm or 0), float(fondo), tuple(inst[0]), tuple(inst[1]), self.seed))
+        self.req.put((self.rid, self.tema, estilo, int(bpm or 0), float(fondo), tuple(inst[0]), tuple(inst[1]), int(inst[2]), self.seed))
 
     def recoger(self, timeout=0):
         """El tramo de la última petición si ya está (tema, cuerpo, cola); None si no."""
@@ -204,7 +204,7 @@ def tocar_infinita(cfg):
     estilo, desde = _elegir_estilo(cfg, None, 0, False)
     bpm = int(cfg.get("bpm") or 0)
     fondo = lambda c: .35 if c.get("textura") else 0   # textura de fondo opcional, y baja
-    inst = lambda c: (tuple(c.get("inst_quitar") or ()), tuple(c.get("inst_anadir") or ()))
+    inst = lambda c: (tuple(c.get("inst_quitar") or ()), tuple(c.get("inst_anadir") or ()), int(c.get("melodia", 1)))
     radio.pedir(estilo, bpm, fondo(cfg), inst(cfg))
     paso = SR // 10                                    # 0,1 s por escritura
     nombres = {}
