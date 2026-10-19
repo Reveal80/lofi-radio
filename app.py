@@ -563,7 +563,7 @@ def api_video_titulo(name):
 
 @app.post("/api/cola")
 def api_cola():
-    """Guarda la lista completa de videos: [{id?, video, hours, activo}].
+    """Guarda la lista completa de videos: [{id?, video, hours, activo, niebla}].
     Solo los activos se emiten (en este orden); los demás guardan su sitio y horas."""
     nueva = []
     for c in request.get_json(force=True).get("cola", []):
@@ -575,7 +575,8 @@ def api_cola():
         except (TypeError, ValueError):
             horas = 1.0
         nueva.append({"id": str(c.get("id") or secrets.token_hex(4))[:16],
-                      "video": video, "hours": round(horas, 5), "activo": c.get("activo") is not False})
+                      "video": video, "hours": round(horas, 5), "activo": c.get("activo") is not False,
+                      "niebla": bool(c.get("niebla"))})   # neblina animada por encima (videofeeder.py)
     with _io_lock:
         escribir_json(COLA_FILE, nueva)
     return jsonify(ok=True, cola=nueva)

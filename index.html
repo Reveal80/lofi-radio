@@ -453,7 +453,10 @@
   .vinfo-line { margin: 0 16px 10px; }
   .vinfo-line span:first-child { white-space: normal; }
   .vinfo-line b { color: var(--ink); font-weight: 600; }
-  .vgridcols, .vitem { display: grid; grid-template-columns: 14px 40px 72px minmax(0,1fr) 76px 150px 52px 40px; gap: 12px; align-items: center; padding: 0 12px; }
+  .vgridcols, .vitem { display: grid; grid-template-columns: 14px 40px 72px minmax(0,1fr) 104px 150px 52px 40px; gap: 12px; align-items: center; padding: 0 12px; }
+  .vflags { display: flex; align-items: center; gap: 8px; }
+  .vflags .switch.niebla { width: 34px; height: 20px; } .vflags .switch.niebla span::after { width: 14px; height: 14px; }
+  .vflags .switch.niebla input:checked + span { background: linear-gradient(135deg, #7fb6ff, #c9d8ff); }
   .vitem { min-height: 64px; border-radius: 13px; position: relative; transition: background .15s, opacity .2s; animation: rowin .4s both; }
   .vitem:hover { background: rgba(255,255,255,.05); }
   .vitem.off .vthumb2, .vitem.off .vname { opacity: .45; }
@@ -840,7 +843,7 @@
         </div>
         <div style="padding:0 10px"><p id="v-err" class="err" style="margin:0 0 10px"></p></div>
         <div class="status-line vinfo-line"><span>Los videos con <b>«en bucle»</b> se emiten en este orden, cada uno el tiempo indicado, y vuelve a empezar. ▶ solo lo ves tú.</span><span id="cola-total"></span></div>
-        <div class="thead vgridcols"><span></span><span>#</span><span></span><span>video</span><span>en bucle</span><span>tiempo en bucle</span><span style="text-align:right">dur.</span><span></span></div>
+        <div class="thead vgridcols"><span></span><span>#</span><span></span><span>video</span><span title="bucle · neblina">bucle · neblina</span><span>tiempo en bucle</span><span style="text-align:right">dur.</span><span></span></div>
         <div class="tracklist" id="vlist"></div>
         <div class="emptystate" id="no-videos"  style="display:none"><div><div class="big">🎞️</div>Aún no hay videos.<br><span style="color:var(--dim);font-size:13px">Sube uno o genera una escena nocturna.</span></div></div>
       </div>
@@ -1762,7 +1765,7 @@ function pintarVideos(s) {
           <button class="vpos" data-act="ver" title="ver el video (solo tú, no se emite)"><span class="n">${emit ? "●" : i + 1}</span>${ICON_PLAY}</button>
           <img class="vthumb2" draggable="false" data-act="ver" src="/videos/${encodeURIComponent(c.video.replace(/\.mp4$/, ".jpg"))}?v=${v.size || 0}" alt="">
           <div class="vname"><div class="vtitle"><b title="doble clic para cambiar el nombre · archivo: ${esc(c.video)}">${esc(nombreVideo(c.video))}</b>${emit ? '<span class="ldot">EN DIRECTO</span>' : ""}<button class="iconbtn vedit" data-act="renombrar" title="cambiar el nombre">${ICON_EDIT}</button></div><small class="vest">${est}</small></div>
-          <label class="switch" title="${c.activo ? "se emite en bucle" : "no se emite"}"><input type="checkbox" data-act="activo" ${c.activo ? "checked" : ""}><span></span></label>
+          <div class="vflags"><label class="switch" title="${c.activo ? "se emite en bucle" : "no se emite"}"><input type="checkbox" data-act="activo" ${c.activo ? "checked" : ""}><span></span></label><label class="switch niebla" title="${c.niebla ? "neblina activada: una capa de niebla en movimiento por encima" : "neblina: añade una capa de niebla en movimiento (útil en videos hechos de una foto)"}"><input type="checkbox" data-act="niebla" ${c.niebla ? "checked" : ""}><span></span></label></div>
           <div class="hours tiempo" title="tiempo que se repite este video antes de pasar al siguiente">
             <input type="number" min="0" max="720" step="1" value="${Math.floor(Math.round(c.hours * 60) / 60)}" data-act="horas" data-parte="h" aria-label="horas"><span>h</span>
             <input type="number" min="0" max="59" step="5" value="${Math.round(c.hours * 60) % 60}" data-act="horas" data-parte="m" aria-label="minutos"><span>min</span>
@@ -1789,6 +1792,10 @@ async function guardarLista(nueva) {
 function activarVideo(name, on = true) {
   const n = lista.map(c => ({...c})), c = n.find(x => x.video === name);
   if (c) { c.activo = on; guardarLista(n); toast(on ? `«${nombreVideo(name)}» en bucle (${hms(c.hours * 3600)})` : `«${nombreVideo(name)}» ya no se emite`); }
+}
+function nieblaVideo(name, on) {
+  const n = lista.map(c => ({...c})), c = n.find(x => x.video === name);
+  if (c) { c.niebla = on; guardarLista(n); toast(on ? `Neblina en «${nombreVideo(name)}»` : `«${nombreVideo(name)}» sin neblina`); }
 }
 function tickCola() {
   const s = ultimoEstado; if (!s) return;
@@ -1855,6 +1862,7 @@ $("vlist").addEventListener("change", e => {
   const row = e.target.closest(".vitem[data-i]"); if (!row) return;
   const i = +row.dataset.i;
   if (e.target.dataset.act === "activo") { activarVideo(lista[i].video, e.target.checked); e.target.blur(); }
+  else if (e.target.dataset.act === "niebla") { nieblaVideo(lista[i].video, e.target.checked); e.target.blur(); }
   else if (e.target.dataset.act === "horas") {
     // tiempo = horas + minutos; los minutos de más se pasan a horas (90 min → 1 h 30 min)
     const caja = e.target.closest(".tiempo");

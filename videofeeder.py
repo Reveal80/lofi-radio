@@ -7,8 +7,10 @@ estándar, así que el codificador de la emisión nunca se reinicia: cambiar de
 video, editar la cola o saltar no corta el directo.
 
 Ficheros de control (en la carpeta de videos):
-  cola.json    [{"id", "video", "hours", "activo"}, ...] — se relee en caliente;
-               los que tienen activo=false no se emiten
+  cola.json    [{"id", "video", "hours", "activo", "niebla"}, ...] — se relee en caliente;
+               los que tienen activo=false no se emiten; con niebla=true se superpone una neblina
+               animada (ruido Perlin de ffmpeg, mezcla «screen» solo en luma) para que las
+               imágenes fijas parezcan moverse
   actual.json  lo que está sonando ahora (lo escribe este proceso)
   saltar       si existe, pasa al siguiente video y lo borra
   aleatorio    si existe, el siguiente video se elige al azar (modo aleatorio del panel)
@@ -209,16 +211,31 @@ def segundo_en_negro():
         time.sleep(1 / FPS)
 
 
+# Neblina: Perlin pequeño (288x108 a 8 fps, barato) con umbral para que haya claros y bancos,
+# vaivén lento por recorte (sin costura), escalado a 1080p y mezcla «screen» solo en luma.
+# Cuesta ~0,5 núcleos más que decodificar a secas; por eso es por video y opcional.
+NIEBLA = ("perlin=s=288x108:r=8:octaves=3:persistence=.55:xscale=.5:yscale=.5:tscale=.04,"
+          f"fps={FPS},lutyuv=y=clip((val-80)*2.2\\,0\\,255),crop=192:108:x=48*(1+sin(t/23)):y=0,"
+          f"scale={W}:{H}:flags=fast_bilinear,format=gray,format=yuv420p")
+
+
 def reproducir(item):
-    """Repite un video hasta cumplir sus horas, saltar o desaparecer de la cola."""
+    """Repite un video hasta cumplir sus horas, saltar o desaparecer de la cola.
+    Devuelve "repetir" si hay que relanzarlo (ha cambiado su neblina)."""
     vf = (f"scale={W}:{H}:force_original_aspect_ratio=decrease,"
           f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,fps={FPS},format=yuv420p")
-    hijo = subprocess.Popen(
-        ["ffmpeg", "-v", "error", "-re", "-stream_loop", "-1", "-i", str(D / item["video"]),
-         "-an", "-vf", vf, "-f", "rawvideo", "-"],
-        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+    niebla = bool(item.get("niebla"))
+    if niebla:
+        cmd = ["ffmpeg", "-v", "error", "-re", "-stream_loop", "-1", "-i", str(D / item["video"]),
+               "-f", "lavfi", "-i", NIEBLA, "-filter_complex",
+               f"[0:v]{vf}[b];[1:v][b]blend=c0_mode=screen:c0_opacity=.4:c1_mode=normal:c1_opacity=0:"
+               f"c2_mode=normal:c2_opacity=0,format=yuv420p", "-an", "-f", "rawvideo", "-"]
+    else:
+        cmd = ["ffmpeg", "-v", "error", "-re", "-stream_loop", "-1", "-i", str(D / item["video"]),
+               "-an", "-vf", vf, "-f", "rawvideo", "-"]
+    hijo = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
     horas = float(item.get("hours") or 1)
-    escribir_actual({"id": item["id"], "video": item["video"], "inicio": time.time(), "horas": horas})
+    escribir_actual({"id": item["id"], "video": item["video"], "inicio": time.time(), "horas": horas, "niebla": niebla})
     buf = bytearray(FRAME)
     vista = memoryview(buf)
     fotogramas = 0
@@ -251,10 +268,12 @@ def reproducir(item):
                 igual = next((c for c in leer_cola() if c["id"] == item["id"]), None)
                 if igual is None:
                     return True
+                if bool(igual.get("niebla")) != niebla:   # neblina activada/quitada: relanzar este video
+                    return "repetir"
                 if float(igual.get("hours") or 1) != horas:
                     horas = float(igual.get("hours") or 1)
                     escribir_actual({"id": item["id"], "video": item["video"],
-                                     "inicio": time.time() - fotogramas / FPS, "horas": horas})
+                                     "inicio": time.time() - fotogramas / FPS, "horas": horas, "niebla": niebla})
             if fotogramas / FPS >= horas * 3600:
                 return True
     finally:
@@ -284,7 +303,11 @@ def main():
             pos = random.choice([k for k in range(len(cola)) if ids[k] != actual_id])
         item = cola[pos]
         actual_id = item["id"]
-        if not (D / item["video"]).exists() or not reproducir(item):
+        r = (D / item["video"]).exists() and reproducir(item)
+        while r == "repetir":   # mismo video con la neblina cambiada
+            item = next((c for c in leer_cola() if c["id"] == item["id"]), item)
+            r = reproducir(item)
+        if not r:
             fallos += 1
             if fallos >= len(cola):   # ningún video de la cola se puede reproducir
                 segundo_en_negro()

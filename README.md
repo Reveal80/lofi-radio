@@ -16,7 +16,8 @@ Toda la interfaz está en español.
   perfecto de 20 segundos. También puedes subir tus propios MP4, imágenes fijas (se convierten en un video de 10 s
   en bucle) o importar música de Pixabay.
 - **Cola de video**: elige qué videos se emiten, cuántas horas cada uno y en qué orden. Se puede
-  cambiar en caliente sin cortar el directo.
+  cambiar en caliente sin cortar el directo. Cada video puede llevar una **neblina** animada por encima,
+  pensada para que las imágenes fijas parezcan moverse.
 - **Emisión 24/7**: la salida a YouTube reconecta sola, sin límite de intentos y sin cortar la vista
   previa, y un vigilante relanza la emisión si el codificador se cae. Modo *local* para probar sin clave
   y modo *directo* para YouTube.
