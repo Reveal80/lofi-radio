@@ -95,6 +95,18 @@ INST = {
     "guitarra": dict(modo="cuerda", filtro=4200, ataque=.002, caida=1.4, sostiene=.25),
     "flauta":   dict(modo="flauta", filtro=3200, ataque=.07, caida=.4, sostiene=.7),
     "campana":  dict(modo="fm", filtro=3800, ataque=.01, caida=1.6, sostiene=.04),
+    # vientos (2026-10-19, el usuario asocia el jazz al saxofón): diente de sierra o cuadrada
+    # pasada por formantes fijos (como el cuerpo del instrumento), con vibrato tardío, un poco
+    # de soplo y «scoop» (la nota entra ligeramente por debajo y sube), que es lo que da el fraseo
+    "saxo":     dict(modo="viento", onda="sawtooth", formantes=[(520, 2.5, 1), (1250, 3, .7), (2400, 4, .25)],
+                     filtro=3400, vib=(.45, 5.2, .22), soplo=(.07, 2200), scoop=.035, nivel=.95,
+                     ataque=.06, caida=.5, sostiene=.62),
+    "trompeta": dict(modo="viento", onda="sawtooth", formantes=[(1150, 4, 1), (1900, 5, .6)],   # con sordina
+                     filtro=2800, vib=(.3, 5.8, .3), soplo=(.03, 3000), scoop=.02, nivel=.7,
+                     ataque=.04, caida=.35, sostiene=.5),
+    "clarinete": dict(modo="viento", onda="square", formantes=[(700, 1.8, 1), (1600, 2.5, .35)],
+                     filtro=2400, vib=(.2, 5, .35), soplo=(.025, 1800), scoop=.012, nivel=.8,
+                     ataque=.05, caida=.4, sostiene=.6),
 }
 
 
@@ -146,6 +158,19 @@ def tocar_nota(buf, inst, m, t, dur, vol, cinta=False):
         out = _cuerda(f0, n)
     elif modo == "fm":     # campana: FM con índice que se apaga
         out = np.sin(2 * np.pi * f0 * tt + 1.6 * np.exp(-tt / .45) * np.sin(2 * np.pi * f0 * 3.5 * tt))
+    elif modo == "viento":  # saxo, trompeta con sordina, clarinete
+        prof, vel, tarda = I["vib"]
+        vib = 1 + (prof / 100) * np.sin(2 * np.pi * vel * tt) * (1 - np.exp(-tt / tarda))
+        vib *= 1 - I.get("scoop", 0) * np.exp(-tt / .06)   # entra un pelo por debajo y sube
+        fase = 2 * np.pi * np.cumsum(f0 * vib) / SR
+        src = signal.square(fase) if I["onda"] == "square" else signal.sawtooth(fase)
+        for fc, q, w in I["formantes"]:
+            out += w * bandpass_q(src, fc, q)
+        out += .35 * lowpass(src, 900)   # el fundamental, para que no suene hueco
+        out /= max(float(np.max(np.abs(out))), 1e-6)
+        out *= I.get("nivel", 1)
+        nivel_soplo, f_soplo = I["soplo"]
+        out += bandpass_q(_RNG.standard_normal(n), f_soplo, 1.5) * nivel_soplo * np.exp(-tt / .25)
     elif modo == "flauta":  # seno con vibrato tardío y algo de soplo
         vib = 1 + .006 * np.sin(2 * np.pi * 5 * tt) * (1 - np.exp(-tt / .3))
         fase = 2 * np.pi * np.cumsum(f0 * vib) / SR
@@ -488,7 +513,7 @@ def _mel_aleatoria(rng, tonica, acordes, menor=False, densidad="normal"):
 # acompañamiento de los acordes y «densidad» cuántas notas lleva la melodía.
 TODOS = dict(
     inst=["rhodes", "rhodes", "piano", "piano", "vibra", "pad", "pulso", "guitarra", "guitarra"],
-    instMel=["vibra", "piano", "caja", "rhodes", "pulso", "chip", "flauta", "campana", "guitarra"],
+    instMel=["vibra", "piano", "caja", "rhodes", "pulso", "chip", "flauta", "campana", "guitarra", "saxo", "trompeta", "clarinete"],
     bat=["boombap", "medio", "shuffle", "roto", "suave", "dilla", "perezoso", "doble"],
     bajo=["largo", "rebote", "caminante"], tex=["vinilo", "vinilo", "lluvia", "cinta"],
     comp=["largo", "pad", "stabs", "charleston", "arpegio", "roto"],
@@ -506,14 +531,14 @@ ESTILOS = {
                   bpm=(62, 74), sw=(.06, .12), menor=.3, inst=["pad", "rhodes", "vibra", "guitarra"],
                   instMel=["vibra", "flauta", "campana", "piano"], bat=["suave", "medio", "perezoso"], bajo=["largo"],
                   tex=["vinilo", "cinta"], comp=["pad", "arpegio", "largo"], densidad=["escasa", "normal"], guino=0, sala=(.15, .4)),
-    "jazz": dict(nombre="Jazz hop", desc="Más swing, acordes con novenas, piano o guitarra y bajo caminante.",
+    "jazz": dict(nombre="Jazz hop", desc="Más swing, acordes con novenas, saxo o trompeta con sordina y bajo caminante.",
                  bpm=(80, 96), sw=(.16, .24), menor=.5, novena=.9, inst=["piano", "rhodes", "guitarra"],
-                 instMel=["vibra", "piano", "flauta", "guitarra"], bat=["shuffle", "dilla", "boombap", "doble"],
+                 instMel=["saxo", "saxo", "trompeta", "clarinete", "vibra", "piano"], bat=["shuffle", "dilla", "boombap", "doble"],
                  bajo=["caminante", "caminante", "rebote"], tex=["vinilo"], comp=["charleston", "stabs", "roto"],
                  densidad=["normal", "densa"], guino=0, progs=[0, 1, 2], partB=.85, sala=(.05, .2)),
     "lluvioso": dict(nombre="Día de lluvia", desc="Melancólico y en menor, con lluvia de fondo y ritmo suave.",
                      bpm=(60, 72), sw=(.08, .14), menor=.9, inst=["piano", "rhodes", "guitarra"],
-                     instMel=["piano", "campana", "vibra", "flauta"], bat=["suave", "medio", "perezoso"], bajo=["largo"],
+                     instMel=["piano", "clarinete", "vibra", "flauta", "saxo"], bat=["suave", "medio", "perezoso"], bajo=["largo"],
                      tex=["lluvia"], comp=["arpegio", "roto", "largo"], densidad=["escasa", "normal"], guino=0),
     "retro": dict(nombre="Retro 8 bits", desc="Lofi con sintes de videojuego, arpegios rápidos y guiños chiptune.",
                   bpm=(82, 96), sw=(.12, .2), menor=.4, inst=["pulso", "pulso", "rhodes"], instMel=["chip", "chip", "pulso"],
@@ -525,7 +550,7 @@ ESTILOS = {
                      densidad=["escasa"], guino=0, intro=1, sala=(.3, .55)),
     "nocturno": dict(nombre="Nocturno", desc="Para dormir: muy lento, en menor, cinta antigua y ritmo casi ausente.",
                      bpm=(54, 62), sw=(.04, .1), menor=.85, inst=["pad", "rhodes", "guitarra"],
-                     instMel=["flauta", "campana", "caja"], bat=["nada", "suave"], bajo=["largo"], tex=["cinta"],
+                     instMel=["flauta", "saxo", "clarinete", "campana"], bat=["nada", "suave"], bajo=["largo"], tex=["cinta"],
                      comp=["pad", "arpegio"], densidad=["escasa"], guino=0, sala=(.25, .5)),
 }
 
