@@ -606,16 +606,25 @@ def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None):
         T.pop("intro_filtro", None)
         fuera = [g for g in _ACOTADOS if g in E and prev.get(g) not in E[g]]
         cambios = set(fuera[:2])
-        n = 1 + int(rng.random() < .35)
+        # variedad: 2 o 3 grupos nuevos por tramo, y acordes/tonalidad nuevos como mínimo cada 3 tramos
+        n = 2 + int(rng.random() < .4)
+        sin_armonia = prev.get("sin_armonia", 0) + 1
+        if sin_armonia >= 3 or rng.random() < .3:
+            cambios.add("armonia")
         libres = [g for g in _GRUPOS if g not in cambios]
-        cambios.update(str(g) for g in rng.choice(libres, size=n, replace=False))
+        cambios.update(str(g) for g in rng.choice(libres, size=min(n, len(libres)), replace=False))
         for g in cambios:
             for k in _GRUPOS[g]:
                 if k in nuevo:
                     T[k] = nuevo[k]
                 else:
                     T.pop(k, None)
-        if "armonia" not in cambios and rng.random() < .4:   # otra melodía sobre los mismos acordes
+            if g in _ACOTADOS:   # que el cambio se note: nunca repetir el valor que ya sonaba
+                opciones = [x for x in E.get(g, TODOS[g]) if x != prev.get(g)]
+                if opciones:
+                    T[g] = str(rng.choice(opciones))
+        T["sin_armonia"] = 0 if "armonia" in cambios else sin_armonia
+        if "armonia" not in cambios and rng.random() < .7:   # otra melodía sobre los mismos acordes
             dens = str(rng.choice(E.get("densidad", TODOS["densidad"])))
             T["mel"] = _mel_aleatoria(rng, T["raiz"], T["acordes"], T["modo"] == "menor", dens)
         if T["inst"] == "pad" and T["comp"] in ("stabs", "charleston", "roto"):
@@ -630,8 +639,8 @@ def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None):
         objetivo = min(max(T["bpm"], lo), hi)
         if objetivo != T["bpm"]:
             T["bpm"] += max(-4, min(4, objetivo - T["bpm"]))
-        elif rng.random() < .3:
-            T["bpm"] = min(max(T["bpm"] + int(rng.integers(-3, 4)), lo), hi)
+        elif rng.random() < .5:
+            T["bpm"] = min(max(T["bpm"] + int(rng.integers(-5, 6)), lo), hi)
     T["cambios"] = sorted(cambios) if prev is not None else []
     return T
 

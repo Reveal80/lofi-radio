@@ -390,7 +390,6 @@
   /* ---------- música: canción del directo ---------- */
   .mtools { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 10px; padding: 0 10px 12px; }
   .hdr-musica { display: flex; gap: 6px; margin-left: 8px; } .hdr-musica[hidden] { display: none; }
-  .hdr-musica .btn.shuffle { width: 34px; align-self: auto; height: 34px; }
   .btn.inf { gap: 7px; } .btn.inf svg { width: 18px; height: 18px; }
   .btn.inf.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
   .btn.inf.on svg { animation: spin 6s linear infinite; }
@@ -400,10 +399,19 @@
   .infpanel .ih small { margin-left: auto; font: 11px var(--mono); color: var(--dim); }
   .infpanel .escenas { grid-template-columns: repeat(8, 1fr); }
   .inf-tempo { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted); }
-  .inf-tempo input[type=range] { max-width: 320px; }
+  .inf-tempo input[type=range] { max-width: 320px; height: 20px; }
+  .inf-tempo input[type=range]::-webkit-slider-runnable-track { height: 6px; background: linear-gradient(90deg, var(--ok) 0, var(--amber) var(--p), rgba(255,255,255,.14) var(--p)); }
+  .inf-tempo input[type=range]::-moz-range-track { height: 6px; } .inf-tempo input[type=range]::-moz-range-progress { height: 6px; background: linear-gradient(90deg, var(--ok), var(--amber)); }
+  .inf-tempo input[type=range]::-webkit-slider-thumb { opacity: 1; width: 16px; height: 16px; margin-top: -5px; background: var(--amber); box-shadow: 0 0 0 4px rgba(255,179,92,.25), 0 0 12px rgba(255,179,92,.5); }
+  .inf-tempo input[type=range]::-moz-range-thumb { width: 16px; height: 16px; background: var(--amber); box-shadow: 0 0 0 4px rgba(255,179,92,.25); }
+  .inf-tempo .lim { font: 10.5px var(--mono); color: var(--dim); }
   .inf-tempo .bpm { font: 700 13px var(--mono); color: var(--ink); min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
   .inf-tempo .btn.sm.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
   .infpanel .now { font: 11.5px var(--mono); color: var(--dim); }
+  .inf-rota { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
+  .inf-rota .chip { cursor: pointer; } .inf-rota .chip:hover { color: var(--ink); border-color: var(--stroke-2); }
+  .inf-rota .chip.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
+  .inf-rota small { margin-left: auto; font: 11px var(--mono); color: var(--dim); }
   @media (max-width: 900px) { .infpanel .escenas { grid-template-columns: repeat(4, 1fr); } }
   .btn.shuffle { padding: 0; width: 40px; align-self: stretch; justify-content: center; color: var(--muted); }
   .btn.shuffle svg { width: 17px; height: 17px; }
@@ -742,9 +750,6 @@
           </div>
         </div>
         <div class="hdr-musica" id="hdr-musica" hidden>
-        <button class="btn sm shuffle" id="m-shuffle" onclick="alternarAleatorio('musica')" title="Activa el modo aleatorio de la música: las canciones sonarán en orden aleatorio" aria-pressed="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
-        </button>
         <button class="btn sm inf" id="m-inf" onclick="alternarInfinita()" title="Radio infinita: compone música lofi en tiempo real, sin fin y sin usar la lista" aria-pressed="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.2 8a4 4 0 1 1 0 8c-3.3 0-5.1-8-12.4-8a4 4 0 1 0 0 8c3.3 0 5.1-8 12.4-8"/></svg>Radio infinita
         </button>
@@ -764,13 +769,18 @@
           <button class="btn" id="m-skip" onclick="saltarCancion()" title="Pasa a otra canción en el directo sin cortar la emisión">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg>Siguiente canción
           </button>
+          <button class="btn sm shuffle" id="m-shuffle" onclick="alternarAleatorio('musica')" title="Activa el modo aleatorio de la lista: las canciones descargadas sonarán en orden aleatorio" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+          </button>
         </div>
         <div class="infpanel" id="inf-panel" hidden>
-          <div class="ih"><b>Radio infinita</b><span>la música se compone sola mientras suena: elige el estilo y el tempo y cambia cuando quieras, entra en el siguiente compás</span><small id="inf-now"></small></div>
+          <div class="ih"><b>Radio infinita</b><span>la música se compone sola mientras suena. Marca uno o varios estilos (con varios, va rotando) y el tempo; los cambios entran en el siguiente compás</span><small id="inf-now"></small></div>
           <div class="escenas" id="inf-estilos"></div>
+          <div class="inf-rota" id="inf-rota" hidden><span>Cambia de estilo cada</span><button class="chip" data-min="15">15 min</button><button class="chip" data-min="30">30 min</button><button class="chip" data-min="60">1 h</button><button class="chip" data-min="120">2 h</button><button class="chip" data-min="240">4 h</button><small id="inf-rota-txt"></small></div>
           <div class="inf-tempo">
-            <span>Tempo</span>
+            <span>Tempo</span><span class="lim">50</span>
             <input type="range" id="inf-bpm" min="50" max="110" step="1" value="76" aria-label="tempo en bpm">
+            <span class="lim">110</span>
             <span class="bpm" id="inf-bpm-v">auto</span>
             <button class="btn sm" id="inf-auto" onclick="tempoAuto()" title="Automático: el tempo deriva poco a poco dentro del rango del estilo">Auto</button>
           </div>
@@ -1768,7 +1778,7 @@ function tickCola() {
     $("m-live-t").textContent = `Radio infinita · ${i.estilo_nombre} · ${i.bpm} bpm`;
     $("m-live-r").textContent = `tramo ${i.n} · ${fmt(Math.min(pas, dur))} / ${fmt(dur)} · ${i.inst} + ${i.instMel} · batería ${i.bat} · ${i.modo}`;
     $("m-live-bar").style.width = dur ? Math.min(100, pas / dur * 100) + "%" : "0";
-    $("inf-now").textContent = i.cambios?.length ? "cambió: " + i.cambios.join(", ") : "";
+    $("inf-now").textContent = (i.cambios?.length ? "cambió: " + i.cambios.join(", ") : "");
   } else if (mu.name) {
     const pas = Date.now() / 1000 - mu.inicio, dur = mu.dur || t?.dur || 0;
     $("m-live-t").textContent = t ? t.title : mu.name;
@@ -1928,11 +1938,16 @@ function pintarInfinita(d, estilos) {
   if (!$("inf-estilos").childElementCount && estilos)
     $("inf-estilos").innerHTML = Object.entries(estilos).map(([k, e]) =>
       `<button class="escena" data-estilo="${esc(k)}" title="${esc(e.desc)}"><span class="em">${ICONO_ESTILO[k] || ICONO_ESTILO.jazz}</span><span class="en">${esc(e.nombre)}</span></button>`).join("");
-  document.querySelectorAll("#inf-estilos .escena").forEach(x => x.classList.toggle("on", x.dataset.estilo === d.estilo));
+  const sel = new Set(d.estilos || []);
+  document.querySelectorAll("#inf-estilos .escena").forEach(x => x.classList.toggle("on", sel.has(x.dataset.estilo)));
+  $("inf-rota").hidden = sel.size < 2;
+  document.querySelectorAll("#inf-rota .chip").forEach(c => c.classList.toggle("on", +c.dataset.min === d.rotar_min));
+  const i = ultimoEstado?.musica?.infinita, nom = k => estilosMusica[k]?.nombre || k;
+  $("inf-rota-txt").textContent = i?.rota_en && sel.size > 1 ? `ahora ${nom(i.estilo)} · luego ${nom(i.siguiente || sig(d.estilos, i.estilo))} en ${Math.max(0, Math.ceil((i.rota_en - Date.now() / 1000) / 60))} min` : "";
   $("inf-auto").classList.toggle("on", !d.bpm);
   if (!infArrastrando) {
     const vivo = ultimoEstado?.musica?.infinita?.bpm;
-    $("inf-bpm").value = d.bpm || vivo || 76;
+    $("inf-bpm").value = d.bpm || vivo || 76; pintarTempo();
     $("inf-bpm-v").textContent = d.bpm ? `${d.bpm} bpm` : vivo ? `auto · ${vivo}` : "auto";
   }
 }
@@ -1948,11 +1963,21 @@ async function ajustarInfinita(cambio, msg) {
   try { await post("/api/infinita", cambio); if (msg) toast(msg); refresh(); }
   catch (e) { toast(e.message, true); }
 }
+function sig(lista, k) { const i = lista.indexOf(k); return lista[(i + 1) % lista.length]; }
 $("inf-estilos").addEventListener("click", e => {
   const b = e.target.closest(".escena"); if (!b) return;
-  ajustarInfinita({estilo: b.dataset.estilo}, `Cambiando a ${b.querySelector(".en").textContent}: entra en el siguiente compás`);
+  const k = b.dataset.estilo, sel = new Set(infinita?.estilos || []);
+  if (sel.has(k)) { if (sel.size === 1) return toast("Deja marcado al menos un estilo", true); sel.delete(k); } else sel.add(k);
+  const lista = [...document.querySelectorAll("#inf-estilos .escena")].map(x => x.dataset.estilo).filter(x => sel.has(x));   // en el orden de los botones
+  const nombre = b.querySelector(".en").textContent;
+  ajustarInfinita({estilos: lista}, sel.has(k) ? (lista.length > 1 ? `${nombre} añadido a la rotación` : `Cambiando a ${nombre}: entra en el siguiente compás`) : `${nombre} quitado de la rotación`);
 });
-$("inf-bpm").addEventListener("input", e => { infArrastrando = true; $("inf-bpm-v").textContent = `${e.target.value} bpm`; });
+$("inf-rota").addEventListener("click", e => {
+  const c = e.target.closest(".chip"); if (!c) return;
+  ajustarInfinita({rotar_min: +c.dataset.min}, `El estilo cambiará cada ${c.textContent}`);
+});
+function pintarTempo() { const r = $("inf-bpm"); r.style.setProperty("--p", `${(r.value - r.min) / (r.max - r.min) * 100}%`); }
+$("inf-bpm").addEventListener("input", e => { infArrastrando = true; $("inf-bpm-v").textContent = `${e.target.value} bpm`; pintarTempo(); });
 $("inf-bpm").addEventListener("change", e => { infArrastrando = false; ajustarInfinita({bpm: +e.target.value}, `Tempo fijo a ${e.target.value} bpm`); });
 function tempoAuto() {
   if (!infinita?.bpm) return ajustarInfinita({bpm: +$("inf-bpm").value}, `Tempo fijo a ${$("inf-bpm").value} bpm`);

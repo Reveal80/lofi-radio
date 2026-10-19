@@ -618,14 +618,18 @@ def api_aleatorio():
 
 # Radio infinita: música procedural compuesta en tiempo real en vez de la lista (audiofeeder.py).
 INFINITA_FILE = TRACKS_DIR / "infinita.json"
-INFINITA_DEF = {"activo": False, "estilo": "aleatorio", "bpm": 0}   # bpm 0 = automático (deriva según el estilo)
+INFINITA_DEF = {"activo": False, "estilos": ["aleatorio"], "rotar_min": 60, "bpm": 0}   # bpm 0 = automático
+ROTAR_MIN = (15, 30, 60, 120, 240)
 
 
 def estado_infinita(cfg=None):
     cfg = cfg if cfg is not None else load_config()
     d = {**INFINITA_DEF, **(cfg.get("infinita") or {})}
+    if "estilo" in d:   # formato de la primera 2.3: un solo estilo
+        d["estilos"] = [d.pop("estilo")]
     d["activo"] = bool(d["activo"])
-    d["estilo"] = d["estilo"] if d["estilo"] in lofigen.ESTILOS else "aleatorio"
+    d["estilos"] = [e for e in d["estilos"] if e in lofigen.ESTILOS] or ["aleatorio"]
+    d["rotar_min"] = int(d["rotar_min"]) if d["rotar_min"] in ROTAR_MIN else 60
     d["bpm"] = int(d["bpm"]) if str(d["bpm"]).isdigit() and 50 <= int(d["bpm"]) <= 110 else 0
     return d
 
@@ -640,14 +644,21 @@ aplicar_infinita(estado_infinita())   # al arrancar, según la configuración gu
 
 @app.post("/api/infinita")
 def api_infinita():
+    """Ajustes de la radio infinita: activo, estilos (lista; varios = rotan cada rotar_min
+    minutos en ese orden), rotar_min (15/30/60/120/240) y bpm (50-110, 0 = automático)."""
     data = request.get_json(force=True) or {}
     d = estado_infinita()
     if "activo" in data:
         d["activo"] = bool(data["activo"])
-    if "estilo" in data:
-        if data["estilo"] not in lofigen.ESTILOS:
-            return jsonify(error="estilo desconocido"), 400
-        d["estilo"] = data["estilo"]
+    if "estilos" in data:
+        estilos = [e for e in (data["estilos"] or []) if isinstance(e, str)]
+        if not estilos or any(e not in lofigen.ESTILOS for e in estilos):
+            return jsonify(error="marca al menos un estilo válido"), 400
+        d["estilos"] = list(dict.fromkeys(estilos))
+    if "rotar_min" in data:
+        if data["rotar_min"] not in ROTAR_MIN:
+            return jsonify(error="intervalo no válido"), 400
+        d["rotar_min"] = int(data["rotar_min"])
     if "bpm" in data:
         try:
             bpm = int(data["bpm"] or 0)

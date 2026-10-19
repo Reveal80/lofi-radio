@@ -11,7 +11,7 @@ Ficheros de control (en la carpeta de canciones):
   actual.json  canción que suena ahora (la escribe este proceso)
   saltar       si existe, pasa a la siguiente canción y lo borra
   aleatorio    si existe, la siguiente canción se elige al azar (modo aleatorio del panel)
-  infinita.json  {"activo", "estilo", "bpm"}: radio infinita. Si está activa, en vez de la lista
+  infinita.json  {"activo", "estilos", "rotar_min", "bpm"}: radio infinita. Si está activa, en vez de la lista
                se compone música procedural en tiempo real (lofigen.tema_siguiente) por tramos de
                16 compases que se superponen (la resonancia de uno sobre el principio del siguiente).
                El render corre en un proceso aparte para no retrasar nunca la salida de audio.
@@ -148,11 +148,11 @@ class RadioInfinita:
         self.proc = None
         self.tema = None
 
-    def pedir(self, cfg):
+    def pedir(self, estilo, bpm):
         self.arrancar()
         self.rid += 1
         self.seed += 1
-        self.req.put((self.rid, self.tema, cfg.get("estilo", "aleatorio"), int(cfg.get("bpm") or 0), self.seed))
+        self.req.put((self.rid, self.tema, estilo, int(bpm or 0), self.seed))
 
     def recoger(self, timeout=0):
         """El tramo de la última petición si ya está (tema, cuerpo, cola); None si no."""
@@ -180,14 +180,28 @@ def _a_pcm(mono):
     return np.repeat(x, 2).tobytes()
 
 
+def _elegir_estilo(cfg, actual, desde, rotar):
+    """Estilo que toca según la selección (varios = rotación cada rotar_min minutos, en el orden
+    de la lista). Si el actual ya no está marcado, pasa al primero. Devuelve (estilo, desde)."""
+    estilos = [e for e in (cfg.get("estilos") or [cfg.get("estilo") or "aleatorio"]) if e]
+    if actual not in estilos:
+        return estilos[0], time.time()
+    if rotar and len(estilos) > 1 and time.time() - desde >= max(1, int(cfg.get("rotar_min") or 60)) * 60:
+        return estilos[(estilos.index(actual) + 1) % len(estilos)], time.time()
+    return actual, desde
+
+
 def tocar_infinita(cfg):
     """Emite la radio infinita hasta que se desactive. Entre tramos no hay cortes: la cola de
     resonancia del anterior (o el final apagado de la canción que sonaba) se suma al principio
-    del siguiente. Cambios de estilo/tempo o «saltar» cortan al compás siguiente con un fundido."""
+    del siguiente. Cambios de estilo/tempo o «saltar» cortan al compás siguiente con un fundido;
+    con varios estilos marcados, el estilo rota cada rotar_min minutos al empezar un tramo."""
     global cola_pendiente
     import numpy as np
     radio = RadioInfinita()
-    radio.pedir(cfg)
+    estilo, desde = _elegir_estilo(cfg, None, 0, False)
+    bpm = int(cfg.get("bpm") or 0)
+    radio.pedir(estilo, bpm)
     paso = SR // 10                                    # 0,1 s por escritura
     nombres = {}
     try:
@@ -204,11 +218,12 @@ def tocar_infinita(cfg):
                     out.write(_a_pcm(cola_pendiente[:paso])); cola_pendiente = cola_pendiente[paso:]
                 else:
                     out.write(SILENCIO)
-                ahora = leer_infinita()
-                if not ahora:
+                cfg = leer_infinita()
+                if not cfg:
                     return
-                if ahora != cfg:
-                    cfg = ahora; radio.pedir(cfg)
+                e2, desde = _elegir_estilo(cfg, estilo, desde, False)
+                if (e2, int(cfg.get("bpm") or 0)) != (estilo, bpm):
+                    estilo, bpm = e2, int(cfg.get("bpm") or 0); radio.pedir(estilo, bpm)
                 listo = radio.recoger(timeout=.05)
             tema, cuerpo, cola = listo
             if cola_pendiente is not None and len(cola_pendiente):
@@ -216,14 +231,20 @@ def tocar_infinita(cfg):
                 cuerpo[:n] += cola_pendiente[:n]
             cola_pendiente = cola
             radio.n += 1
-            radio.pedir(cfg)                           # el siguiente se compone mientras suena este
+            estilos = cfg.get("estilos") or [estilo]
+            rotar_min = max(1, int(cfg.get("rotar_min") or 60))
+            # el siguiente se compone mientras suena este (y es donde rota el estilo si toca)
+            estilo_sig, desde_sig = _elegir_estilo(cfg, estilo, desde, True)
+            radio.pedir(estilo_sig, bpm)
             compas = int(4 * 60 / tema["bpm"] * SR)
             escribir_actual({"name": "radio-infinita", "inicio": time.time(), "dur": len(cuerpo) / SR,
-                             "infinita": {"n": radio.n, "estilo": cfg.get("estilo", "aleatorio"),
-                                          "estilo_nombre": nombres.get(cfg.get("estilo"), "Aleatorio"),
-                                          "bpm": tema["bpm"], "inst": tema.get("inst"), "instMel": tema.get("instMel"),
-                                          "bat": tema.get("bat"), "modo": tema.get("modo"), "tex": tema.get("tex"),
-                                          "cambios": tema.get("cambios", [])}})
+                             "infinita": {"n": radio.n, "estilo": estilo, "estilo_nombre": nombres.get(estilo, estilo),
+                                          "estilos": estilos, "bpm": tema["bpm"], "inst": tema.get("inst"),
+                                          "instMel": tema.get("instMel"), "bat": tema.get("bat"), "modo": tema.get("modo"),
+                                          "tex": tema.get("tex"), "cambios": tema.get("cambios", []),
+                                          "siguiente": estilo_sig if estilo_sig != estilo else None,
+                                          "rota_en": (desde + rotar_min * 60) if len(estilos) > 1 else 0}})
+            estilo, desde = estilo_sig, desde_sig
             pos, ultimo, corte_en, nuevo = 0, time.time(), None, None
             while pos < len(cuerpo):
                 out.write(_a_pcm(cuerpo[pos:pos + paso])); pos += paso
@@ -235,9 +256,13 @@ def tocar_infinita(cfg):
                         out.write(_a_pcm(fin * np.linspace(1, 0, len(fin), dtype=np.float32)))
                         cola_pendiente = None
                         return
-                    if ahora != cfg or SALTAR.exists():
+                    cfg = ahora
+                    e2, desde = _elegir_estilo(cfg, estilo, desde, False)
+                    b2 = int(cfg.get("bpm") or 0)
+                    if (e2, b2) != (estilo, bpm) or SALTAR.exists():
                         SALTAR.unlink(missing_ok=True)
-                        cfg = ahora; radio.pedir(cfg)
+                        estilo, bpm = e2, b2
+                        radio.pedir(estilo, bpm)
                         nuevo = False                  # esperando el tramo con los ajustes nuevos
                 if nuevo is False:
                     r = radio.recoger()
