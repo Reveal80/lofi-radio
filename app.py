@@ -924,13 +924,21 @@ def _cgroup_kv(nombre):
 
 
 def _cpu_host():
-    """Ticks totales y ocupados de todas las CPU del servidor (/proc/stat)."""
+    """Ticks (total, ocupado) de todas las CPU del servidor y de cada núcleo (/proc/stat)."""
+    total = ocupado = 0
+    nucleos = []
     for linea in _leer("/proc/stat").splitlines():
-        if linea.startswith("cpu "):
-            v = [int(x) for x in linea.split()[1:]]
-            total = sum(v)
-            return total, total - v[3] - v[4]   # sin idle ni iowait
-    return 0, 0
+        if not linea.startswith("cpu"):
+            continue
+        nombre, *v = linea.split()
+        v = [int(x) for x in v]
+        t = sum(v)
+        o = t - v[3] - v[4]   # sin idle ni iowait
+        if nombre == "cpu":
+            total, ocupado = t, o
+        else:
+            nucleos.append((t, o))
+    return total, ocupado, nucleos
 
 
 def _mem_host():
@@ -1032,7 +1040,7 @@ def api_stats():
         cpu_max = _leer(CGROUP / "cpu.max").split()
         limite_cpu = (int(cpu_max[0]) / int(cpu_max[1])) if len(cpu_max) == 2 and cpu_max[0] != "max" else ncpu
         uso_cont = _cgroup_kv("cpu.stat").get("usage_usec", 0)
-        host_total, host_ocupado = _cpu_host()
+        host_total, host_ocupado, host_nucleos = _cpu_host()
         procs = _procesos()
         net = {}
         for linea in _leer("/proc/net/dev").splitlines():
@@ -1053,11 +1061,15 @@ def api_stats():
         dt = (ahora - prev["t"]) if prev else 0
         cpu_cont_pct = cpu_host_pct = rx_kbps = tx_kbps = rd_bps = wr_bps = 0.0
         proc_pct = {}
+        nucleos_pct = [0.0] * len(host_nucleos)
         if dt > 0:
             cpu_cont_pct = (uso_cont - prev["uso_cont"]) / (dt * 1e6) * 100       # % de un núcleo
             d_total = host_total - prev["host_total"]
             if d_total > 0:
                 cpu_host_pct = (host_ocupado - prev["host_ocupado"]) / d_total * 100
+            for i, (t, o) in enumerate(host_nucleos):
+                if i < len(prev["nucleos"]) and t - prev["nucleos"][i][0] > 0:
+                    nucleos_pct[i] = (o - prev["nucleos"][i][1]) / (t - prev["nucleos"][i][0]) * 100
             rx_kbps = (rx - prev["rx"]) * 8 / dt / 1000
             tx_kbps = (tx - prev["tx"]) * 8 / dt / 1000
             rd_bps = (io.get("rbytes", 0) - prev["io"].get("rbytes", 0)) / dt
@@ -1068,7 +1080,7 @@ def api_stats():
                     proc_pct[pid] = (pr["ticks"] - antes["ticks"]) / _CLK_TCK / dt * 100
         _stats_prev.clear()
         _stats_prev.update(t=ahora, uso_cont=uso_cont, host_total=host_total, host_ocupado=host_ocupado,
-                           rx=rx, tx=tx, io=io, procs=procs)
+                           nucleos=host_nucleos, rx=rx, tx=tx, io=io, procs=procs)
 
         mem = _mem_host()
         mem_cont = int(_leer(CGROUP / "memory.current", "0") or 0)
@@ -1100,6 +1112,7 @@ def api_stats():
             },
             "servidor": {
                 "cpu_pct": round(cpu_host_pct, 1), "ncpu": ncpu, "carga": carga,
+                "nucleos": [round(x, 1) for x in nucleos_pct],
                 "mem_total": mem.get("MemTotal", 0), "mem_disponible": mem.get("MemAvailable", 0),
                 "swap_total": mem.get("SwapTotal", 0), "swap_libre": mem.get("SwapFree", 0),
                 "uptime": round(uptime_host),

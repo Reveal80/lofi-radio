@@ -543,6 +543,9 @@
   .sx .bar i { display: block; height: 100%; width: 0; border-radius: 99px; background: var(--ok); transition: width .6s ease, background .6s; }
   .sx .bar i.warn { background: var(--amber); } .sx .bar i.bad { background: var(--live); }
   .sx.wide { grid-column: 1 / -1; }
+  .sx-cores { display: grid; grid-template-columns: repeat(auto-fit, minmax(28px, 1fr)); gap: 6px; margin-top: 2px; }
+  .sx-cores div { display: flex; flex-direction: column; gap: 3px; font: 9.5px var(--mono); color: var(--dim); text-align: center; }
+  .sx-cores .bar { height: 4px; }
   .sx-tab { width: 100%; border-collapse: collapse; font: 12px var(--mono); }
   .sx-tab th { text-align: left; font-weight: 500; color: var(--dim); padding: 2px 8px 6px 0; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; }
   .sx-tab td { padding: 4px 8px 4px 0; border-top: 1px solid var(--stroke); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -888,7 +891,7 @@
     <section class="sx-sec">
       <h3>Servidor <small id="sx-s-info"></small></h3>
       <div class="sx-grid">
-        <div class="sx"><div class="k">CPU total</div><div class="v" id="sx-s-cpu">—</div><div class="bar"><i id="sx-s-cpu-b"></i></div><div class="d" id="sx-s-cpu-d"></div></div>
+        <div class="sx"><div class="k">CPU del servidor</div><div class="v" id="sx-s-cpu">—</div><div class="bar"><i id="sx-s-cpu-b"></i></div><div class="sx-cores" id="sx-cores"></div><div class="d" id="sx-s-cpu-d"></div></div>
         <div class="sx"><div class="k">Memoria</div><div class="v" id="sx-s-mem">—</div><div class="bar"><i id="sx-s-mem-b"></i></div><div class="d" id="sx-s-mem-d"></div></div>
         <div class="sx"><div class="k">Carga del servidor</div><div class="v" id="sx-s-load">—</div><div class="bar"><i id="sx-s-load-b"></i></div><div class="d" id="sx-s-load-d"></div></div>
         <div class="sx"><div class="k">Disco de datos (libre)</div><div class="v" id="sx-dk">—</div><div class="bar"><i id="sx-dk-b"></i></div><div class="d" id="sx-dk-d"></div></div>
@@ -1313,10 +1316,10 @@ function sxBar(id, pct) { const i = $(id); pct = Math.max(0, Math.min(100, pct |
 function pintarStats(x) {
   const c = x.contenedor, s = x.servidor, r = x.red, d = x.disco, e = x.emision;
   // contenedor
-  const cpuRel = c.cpu_pct / (c.cpu_limite * 100) * 100;   // respecto a lo que puede usar
-  $("sx-c-cpu").innerHTML = `${c.cpu_pct.toFixed(0)}<small>%</small>`;
-  sxBar("sx-c-cpu-b", cpuRel);
-  $("sx-c-cpu-d").textContent = `${(c.cpu_pct / 100).toFixed(2)} de ${c.cpu_limite} núcleos`;
+  const cpuTot = c.cpu_pct / c.ncpu;   // % sobre todos los núcleos del servidor (100 % = todos a tope)
+  $("sx-c-cpu").innerHTML = `${cpuTot.toFixed(0)}<small>% de ${c.ncpu} núcleos</small>`;
+  sxBar("sx-c-cpu-b", cpuTot);
+  $("sx-c-cpu-d").textContent = `equivale a ${(c.cpu_pct / 100).toFixed(2)} núcleos a tope` + (c.cpu_limite < c.ncpu ? ` · límite ${c.cpu_limite}` : "");
   $("sx-c-mem").innerHTML = `${fmtB(c.mem_rss)}`;
   sxBar("sx-c-mem-b", c.mem / c.mem_limite * 100);
   $("sx-c-mem-d").textContent = `+ ${fmtB(c.mem_cache)} caché · límite ${fmtB(c.mem_limite)}`;
@@ -1334,9 +1337,12 @@ function pintarStats(x) {
     $("sx-ff").textContent = e.running ? "arrancando…" : "parado"; sxBar("sx-ff-b", 0); $("sx-ff-d").textContent = e.running ? "esperando la primera línea de progreso" : "la emisión no está en marcha";
   }
   // servidor
-  $("sx-s-cpu").innerHTML = `${s.cpu_pct.toFixed(0)}<small>%</small>`;
+  $("sx-s-cpu").innerHTML = `${s.cpu_pct.toFixed(0)}<small>% de ${s.ncpu} núcleos</small>`;
   sxBar("sx-s-cpu-b", s.cpu_pct);
-  $("sx-s-cpu-d").textContent = `${s.ncpu} núcleos · la radio supone el ${(c.cpu_pct / s.ncpu).toFixed(0)} %`;
+  const cores = $("sx-cores");
+  if (cores.children.length !== s.nucleos.length) cores.innerHTML = s.nucleos.map((_, i) => `<div><div class="bar"><i></i></div>${i}</div>`).join("");
+  s.nucleos.forEach((pct, i) => { const b = cores.children[i].querySelector("i"); b.style.width = Math.min(100, pct) + "%"; b.className = pct >= 90 ? "bad" : pct >= 70 ? "warn" : ""; b.parentElement.parentElement.title = `núcleo ${i}: ${pct.toFixed(0)} %`; });
+  $("sx-s-cpu-d").textContent = `por núcleo: ${s.nucleos.map(v => v.toFixed(0) + " %").join(" · ")} · la radio supone el ${cpuTot.toFixed(0)} %`;
   const usada = s.mem_total - s.mem_disponible;
   $("sx-s-mem").innerHTML = `${fmtB(usada)}`;
   sxBar("sx-s-mem-b", usada / s.mem_total * 100);
