@@ -118,7 +118,7 @@ def _render_worker(req, res):
         rid, prev, estilo, bpm, fondo, opc, seed = item
         try:
             tema = lofigen.tema_siguiente(prev, seed, estilo, bpm or None, tuple(opc.get("quitar", ())), tuple(opc.get("anadir", ())),
-                                          int(opc.get("melodia", 1)), False)
+                                          int(opc.get("melodia", 1)), False, bool(opc.get("minimo")))
             cuerpo, cola = lofigen.render_theme(tema, 1, seed, continuo=True, fondo=fondo)
             res.put((rid, tema, cuerpo.astype(np.float32), cola.astype(np.float32)))
         except Exception as e:   # un tramo fallido no tumba la radio: se pide otro
@@ -242,6 +242,7 @@ def tocar_infinita(cfg):
     radio.pedir(estilo, bpm, fondo(cfg), inst(cfg))
     paso = SR // 10                                    # 0,1 s por escritura
     fon, ins = fondo(cfg), inst(cfg)
+    entrada_suave = False                              # el próximo tramo entra con fundido (cambio pedido)
     siguiente = None                                   # tramo ya recogido que entra en el corte
     try:
         while True:
@@ -259,6 +260,11 @@ def tocar_infinita(cfg):
                     estilo, bpm, fon, ins = e2, int(cfg.get("bpm") or 0), fondo(cfg), inst(cfg); radio.pedir(estilo, bpm, fon, ins)
                 listo = radio.recoger(timeout=.05)
             tema, cuerpo, cola = listo
+            compas = int(4 * 60 / tema["bpm"] * SR)
+            if entrada_suave:                          # tras un cambio pedido: entra en dos compases
+                m = min(2 * compas, len(cuerpo))
+                cuerpo[:m] *= np.linspace(.15, 1, m, dtype=np.float32) ** 1.5
+                entrada_suave = False
             if cola_pendiente is not None and len(cola_pendiente):
                 n = min(len(cola_pendiente), len(cuerpo))
                 cuerpo[:n] += cola_pendiente[:n]
@@ -269,7 +275,6 @@ def tocar_infinita(cfg):
             # el siguiente se compone mientras suena este (y es donde rota el estilo si toca)
             estilo_sig, desde_sig = _elegir_estilo(cfg, estilo, desde, True)
             radio.pedir(estilo_sig, bpm, fon, ins)
-            compas = int(4 * 60 / tema["bpm"] * SR)
             escribir_actual({"name": "radio-infinita", "inicio": time.time(), "dur": len(cuerpo) / SR,
                              "infinita": {"n": radio.n, "estilo": estilo,
                                           "estilo_nombre": " + ".join(nombres.get(x, x) for x in estilo.split("+")),
@@ -283,7 +288,7 @@ def tocar_infinita(cfg):
                                           "melodia": ins["melodia"],
                                           "rota_en": (desde + rotar_min * 60) if len(estilos) > 1 and "+" not in estilo else 0}})
             estilo, desde = estilo_sig, desde_sig
-            pos, ultimo, corte_en, nuevo = 0, time.time(), None, None
+            pos, ultimo, corte_en, nuevo, suave = 0, time.time(), None, None, False
             while pos < len(cuerpo):
                 out.write(_a_pcm(cuerpo[pos:pos + paso])); pos += paso
                 if nuevo is None and time.time() - ultimo > .3:
@@ -297,19 +302,26 @@ def tocar_infinita(cfg):
                     cfg = ahora
                     e2, desde = _elegir_estilo(cfg, estilo, desde, False)
                     b2, f2, i2 = int(cfg.get("bpm") or 0), fondo(cfg), inst(cfg)
-                    if (e2, b2, f2, i2) != (estilo, bpm, fon, ins) or SALTAR.exists():
+                    salto = SALTAR.exists()
+                    if (e2, b2, f2, i2) != (estilo, bpm, fon, ins) or salto:
                         SALTAR.unlink(missing_ok=True)
                         estilo, bpm, fon, ins = e2, b2, f2, i2
-                        radio.pedir(estilo, bpm, fon, ins)
+                        # cambio pedido: tramo «mínimo» (solo cambia lo tocado) que entra al acabar la frase
+                        # de 4 compases, con fundido largo; «saltar» sí corta al compás siguiente
+                        suave = not salto
+                        radio.pedir(estilo, bpm, fon, {**ins, "minimo": suave})
                         nuevo = False                  # esperando el tramo con los ajustes nuevos
                 if nuevo is False:
                     r = radio.recoger()
                     if r is not None:
                         nuevo = r
-                        corte_en = min(len(cuerpo), ((pos // compas) + 1) * compas)   # al compás siguiente
+                        unidad = compas * 4 if suave else compas
+                        corte_en = min(len(cuerpo), ((pos // unidad) + 1) * unidad)
                 if corte_en is not None and pos >= corte_en:
-                    resto = cuerpo[pos:pos + 4 * SR]
-                    cola_pendiente = resto * np.linspace(1, 0, len(resto), dtype=np.float32)
+                    largo = 2 * compas if suave else 4 * SR
+                    resto = cuerpo[pos:pos + largo]
+                    cola_pendiente = resto * np.linspace(1, 0, len(resto), dtype=np.float32) ** .7
+                    entrada_suave = suave
                     break
             if nuevo:                                  # encadena ya con el tramo nuevo
                 siguiente = nuevo

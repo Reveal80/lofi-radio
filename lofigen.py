@@ -743,7 +743,7 @@ _ACOTADOS = ("inst", "instMel", "bat", "bajo", "tex", "comp")   # listas que cad
 MELODIA = {0: (0, 0), 1: (2, 3), 2: (4, 5), 3: (12, 12)}   # nivel → (mín, máx) compases con melodía de los 12 de A/B
 
 
-def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None, quitar=(), anadir=(), melodia=1, inst_todos=False):
+def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None, quitar=(), anadir=(), melodia=1, inst_todos=False, minimo=False):
     """Compone el tramo siguiente de la radio infinita: hereda casi todo del anterior y cambia
     uno o dos grupos de parámetros. Si el estilo pedido no admite algo del tramo anterior
     (instrumento, batería…), lo va acercando al estilo de dos en dos cosas por tramo, así el
@@ -758,13 +758,19 @@ def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None, quitar=(), anadir=(
         T.pop("intro_filtro", None)
         fuera = [g for g in _ACOTADOS if g in E and prev.get(g) not in E[g]]
         cambios = set(fuera[:2])
-        # variedad: 2 o 3 grupos nuevos por tramo, y acordes/tonalidad nuevos como mínimo cada 3 tramos
-        n = 2 + int(rng.random() < .4)
         sin_armonia = prev.get("sin_armonia", 0) + 1
-        if sin_armonia >= 3 or rng.random() < .3:
-            cambios.add("armonia")
-        libres = [g for g in _GRUPOS if g not in cambios]
-        cambios.update(str(g) for g in rng.choice(libres, size=min(n, len(libres)), replace=False))
+        if minimo:
+            # cambio pedido por el usuario (instrumento, estilo…): solo lo imprescindible, para que entre
+            # de forma natural; el instrumento recién añadido pasa a llevar la melodía
+            if anadir and anadir[-1] not in (prev.get("inst"), prev.get("instMel")) and anadir[-1] in INST_NOMBRES:
+                cambios.add("instMel")
+        else:
+            # variedad: 2 o 3 grupos nuevos por tramo, y acordes/tonalidad nuevos como mínimo cada 3 tramos
+            n = 2 + int(rng.random() < .4)
+            if sin_armonia >= 3 or rng.random() < .3:
+                cambios.add("armonia")
+            libres = [g for g in _GRUPOS if g not in cambios]
+            cambios.update(str(g) for g in rng.choice(libres, size=min(n, len(libres)), replace=False))
         for g in cambios:
             for k in _GRUPOS[g]:
                 if k in nuevo:
@@ -775,8 +781,10 @@ def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None, quitar=(), anadir=(
                 opciones = [x for x in E.get(g, TODOS[g]) if x != prev.get(g)]
                 if opciones:
                     T[g] = str(rng.choice(opciones))
+        if minimo and anadir and "instMel" in cambios and anadir[-1] in E.get("instMel", []):
+            T["instMel"] = anadir[-1]
         T["sin_armonia"] = 0 if "armonia" in cambios else sin_armonia
-        if "armonia" not in cambios and rng.random() < .7:   # otra melodía sobre los mismos acordes
+        if "armonia" not in cambios and not minimo and rng.random() < .7:   # otra melodía sobre los mismos acordes
             dens = str(rng.choice(E.get("densidad", TODOS["densidad"])))
             T["mel"] = _mel_aleatoria(rng, T["raiz"], T["acordes"], T["modo"] == "menor", dens, ESCALAS.get(T.get("escala")))
         if T["inst"] == "pad" and T["comp"] in ("stabs", "charleston", "roto"):
@@ -805,7 +813,7 @@ def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None, quitar=(), anadir=(
         T["instMel"] = suave[T["instMel"]]
     if bpm:
         T["bpm"] = int(bpm)
-    elif prev is not None:   # deriva: hacia el rango del estilo, como mucho 4 bpm por tramo
+    elif prev is not None and not minimo:   # deriva: hacia el rango del estilo, como mucho 4 bpm por tramo
         lo, hi = (int(x) for x in E.get("bpm", (60, 92)))
         objetivo = min(max(T["bpm"], lo), hi)
         if objetivo != T["bpm"]:
