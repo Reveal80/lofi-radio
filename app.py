@@ -26,7 +26,7 @@ import lofigen
 import muestras
 import piezas
 
-VERSION = "3.0"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
+VERSION = "3.1"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
 BASE = Path(__file__).parent
 TRACKS_DIR = BASE / "data" / "tracks"
 VIDEOS_DIR = BASE / "data" / "videos"    # biblioteca de videos + cola

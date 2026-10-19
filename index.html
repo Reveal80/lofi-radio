@@ -604,6 +604,30 @@
     .tracks-card { min-height: 420px; }
     .playerbar { position: sticky; bottom: 0; z-index: 10; }
   }
+  @media (max-width: 640px) {
+    html { overflow-x: hidden; }
+    .topbar { flex-wrap: wrap; white-space: normal; gap: 6px 8px; padding: 8px 10px; }
+    .brand { flex: 1 0 100%; }
+    .compose-wrap, .pixa-wrap + .compose-wrap, .stats { margin-left: 0; }
+    .stats { flex-wrap: wrap; gap: 6px; }
+    .popover, #px-pop { width: min(420px, calc(100vw - 20px)); left: 0; right: auto; }
+    .grid { padding: 10px; gap: 12px; }
+    .card { padding: 14px 12px; }
+    .hero { grid-template-columns: 1fr; gap: 10px; }
+    .mtools, #pane-videos .mtools, #pane-musica .mtools { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 0 10px; }
+    .mtools .mlive { flex: 1 0 100%; }
+    .mtools .btn { flex: 1 1 auto; justify-content: center; }
+    .infpanel { margin: 0 0 12px; padding: 10px; }
+    .infpanel .escenas, .escenas { grid-template-columns: repeat(2, 1fr); }
+    .infpanel .ih { flex-wrap: wrap; } .infpanel .ih small { margin-left: 0; width: 100%; }
+    .inf-tempo { flex-wrap: wrap; } .inf-tempo input[type=range] { flex: 1 1 140px; max-width: none; }
+    .inf-tempo .btn { margin-left: 0 !important; }
+    .genrow { grid-template-columns: 1fr; }
+    .search { width: 100%; }
+    .card-h { flex-wrap: wrap; gap: 6px 10px; }
+    .playerbar { padding: 8px 10px; }
+    .sx { width: 100vw; }
+  }
   @media (max-width: 860px) {
     .grid { grid-template-columns: minmax(0, 1fr); padding: 16px; }
     .genrow { grid-template-columns: 120px minmax(0,1fr); }
@@ -866,7 +890,7 @@
           <div class="liveplayer">
             <video id="s-video" muted autoplay playsinline></video>
             <span class="pill badge live" id="s-badge">● EN DIRECTO</span>
-            <div class="lp-wait" id="s-wait"><div><div class="spinner"></div>conectando con el directo…</div></div>
+            <div class="lp-wait" id="s-wait" onclick="if (event.target.tagName !== 'A') sv.play().catch(() => {})"><div><div class="spinner"></div>conectando con el directo…</div></div>
             <div class="lp-ctrls">
               <div class="lp-vol" title="volumen del directo en esta página (no cambia lo que se emite)">
                 <button class="iconbtn" id="s-mute" onclick="silenciarDirecto()" title="activar/silenciar sonido"></button>
@@ -2097,7 +2121,7 @@ function pintarInfinita(d, estilos) {
   const ninguno = ![...base, ...anadir].some(k => !quitar.has(k));
   $("inf-inst-nota").textContent = ninguno ? "ninguno: solo la melodía, continua y sin acordes, bajo ni batería" : "";
   chips.querySelectorAll(".chip[data-inst]").forEach(c => {
-    const k = c.dataset.inst, on = (base.has(k) || anadir.has(k)) && !quitar.has(k);
+    const k = c.dataset.inst, on = d.inst_aleatorio ? (base.has(k) || suena.has(k)) : (base.has(k) || anadir.has(k)) && !quitar.has(k);
     c.classList.toggle("on", on); c.classList.toggle("extra", on && anadir.has(k) && !base.has(k)); c.classList.toggle("suena", suena.has(k));
     c.title = suena.has(k) ? "suena ahora · pulsa para quitarlo" : on ? (anadir.has(k) && !base.has(k) ? "añadido por ti · pulsa para quitarlo" : "lo usa el estilo · pulsa para quitarlo") : "no suena · pulsa para añadirlo";
   });
@@ -2137,7 +2161,9 @@ $("inf-inst-chips").addEventListener("click", e => {
 });
 function alternarAzar(k) {
   const on = !infinita?.[k];
-  ajustarInfinita({[k]: on}, k === "inst_aleatorio" ? (on ? "Instrumentos al azar: cualquiera puede sonar" : "Instrumentos según el estilo")
+  // instrumentos al azar: el sistema elige entre todos (se olvidan los quitados y añadidos a mano)
+  const cambio = k === "inst_aleatorio" && on ? {[k]: on, inst_quitar: [], inst_anadir: []} : {[k]: on};
+  ajustarInfinita(cambio, k === "inst_aleatorio" ? (on ? "Instrumentos al azar: cualquiera puede sonar" : "Instrumentos según el estilo")
                                                   : (on ? "Melodía al azar: cada tramo con un nivel distinto" : "Melodía con nivel fijo"));
 }
 $("inf-mel").addEventListener("click", e => {
@@ -2211,15 +2237,26 @@ function avisoDirecto(html) { $("s-wait").hidden = false; $("s-wait").innerHTML 
 function falloDirecto(msg) {
   desconectarDirecto();
   reintentarEn = Date.now() + 10000;
-  avisoDirecto(`${esc(msg)}<br><small style="color:var(--dim)">Reintento en 10 s · también puedes verlo en VLC: rtsp://${esc(location.hostname)}:8554/radio</small>`);
+  avisoDirecto(`${esc(msg)}<br><small style="color:var(--dim)">Reintento en 10 s · <a href="/live/radio/index.m3u8" target="_blank" rel="noopener" style="color:var(--ink)">abrir el directo en el reproductor del dispositivo</a> · o en VLC: rtsp://${esc(location.hostname)}:8554/radio</small>`);
 }
 async function conectarDirecto() {
   if (conectado || Date.now() < reintentarEn) return;
   conectado = true; avisoDirecto(ESPERANDO);
   const url = "/live/radio/index.m3u8", nativo = sv.canPlayType("application/vnd.apple.mpegurl");
-  // hls.js siempre que haya MediaSource (todos los navegadores de escritorio). El
-  // reproductor HLS propio de Chrome reciente no reproduce este directo (audio y
-  // video en pistas separadas): solo se usa el nativo en iPhone/Safari sin MSE.
+  // iPhone/iPad (y Safari): su reproductor HLS nativo es el fiable; en el resto, hls.js siempre que haya
+  // MediaSource (el HLS propio de Chrome no reproduce este directo: audio y video en pistas separadas)
+  const apple = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) || /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  const tocar = () => sv.play().catch(e => {   // autoplay bloqueado (móvil, ahorro de batería): hace falta un toque
+    if (e && e.name === "NotAllowedError") avisoDirecto('<b>Toca aquí para ver el directo</b><br><small style="color:var(--dim)">el navegador no deja arrancar el video solo</small>');
+  });
+  if (apple && nativo) {
+    sv.src = url; tocar();
+    clearTimeout(avisoLento);
+    avisoLento = setTimeout(() => {
+      if (conectado && sv.readyState < 3) avisoDirecto(ESPERANDO + `<br><small style="color:var(--dim)">tarda más de lo normal… <a href="${url}" target="_blank" rel="noopener" style="color:var(--ink)">abrir el directo en el reproductor del móvil</a> o en VLC: rtsp://${esc(location.hostname)}:8554/radio</small>`);
+    }, 15000);
+    return;
+  }
   if (!window.Hls && window.MediaSource) await cargarHls();
   if (!conectado) return;   // se paró mientras se descargaba
   if (window.Hls && Hls.isSupported()) {
@@ -2227,10 +2264,10 @@ async function conectarDirecto() {
       return falloDirecto("Este navegador no puede reproducir video H.264 (pasa en algunos Chromium o Firefox de Linux sin códecs). Prueba con Chrome o Edge.");
     hls = new Hls({liveSyncDurationCount: 2, manifestLoadingMaxRetry: 30, manifestLoadingRetryDelay: 2000});
     hls.loadSource(url); hls.attachMedia(sv);
-    hls.on(Hls.Events.MANIFEST_PARSED, () => sv.play().catch(() => {}));
+    hls.on(Hls.Events.MANIFEST_PARSED, tocar);
     hls.on(Hls.Events.ERROR, (_, d) => { if (d.fatal) falloDirecto(`No se pudo reproducir el directo (${d.details}).`); });
   } else if (nativo) {
-    sv.src = url; sv.play().catch(() => {});
+    sv.src = url; tocar();
   } else {
     return falloDirecto(window.Hls ? "Este navegador no puede reproducir el directo." : "No se pudo cargar el reproductor del directo.");
   }
