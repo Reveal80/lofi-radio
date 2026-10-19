@@ -710,6 +710,9 @@
           <button class="btn" id="m-skip" onclick="saltarCancion()" title="Pasa a otra canción en el directo sin cortar la emisión">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg>Siguiente canción
           </button>
+          <button class="btn sm shuffle" id="m-shuffle" onclick="alternarAleatorio('musica')" title="Activa el modo aleatorio de la música: las canciones sonarán en orden aleatorio" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+          </button>
         </div>
         <div class="thead"><span></span><span>#</span><span>título</span><span style="text-align:center; position:relative; left:-50px">tema</span><span style="text-align:right">dur.</span><span></span></div>
         <div class="tracklist" id="tracks"></div>
@@ -725,7 +728,7 @@
           <button class="btn" id="q-skip" onclick="saltarVideo()" title="Pasa al siguiente video en bucle sin cortar el directo">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg>Siguiente video
           </button>
-          <button class="btn sm shuffle" id="q-shuffle" onclick="alternarAleatorio()" title="Activa el modo aleatorio: los videos en bucle y la música sonarán en orden aleatorio" aria-pressed="false">
+          <button class="btn sm shuffle" id="q-shuffle" onclick="alternarAleatorio('video')" title="Activa el modo aleatorio de los videos: los videos en bucle se emitirán en orden aleatorio" aria-pressed="false">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
           </button>
         </div>
@@ -1197,8 +1200,8 @@ async function refresh() {
   $("s-badge").textContent = live ? "● EN DIRECTO" : "● VISTA PREVIA";
   $("s-badge").className = "pill badge " + (live ? "live" : "warn");
   $("q-skip").disabled = !s.stream.running;
-  $("q-shuffle").classList.toggle("on", !!s.aleatorio); $("q-shuffle").setAttribute("aria-pressed", String(!!s.aleatorio));
-  $("q-shuffle").title = s.aleatorio ? "Modo aleatorio activado: videos y música suenan en orden aleatorio. Pulsa para volver al orden de las listas" : "Activa el modo aleatorio: los videos en bucle y la música sonarán en orden aleatorio";
+  pintarAleatorio("q-shuffle", s.aleatorio?.video, "los videos en bucle se emiten", "los videos en bucle se emitirán");
+  pintarAleatorio("m-shuffle", s.aleatorio?.musica, "las canciones suenan", "las canciones sonarán");
   if (s.stream.running) conectarDirecto(); else desconectarDirecto();
   $("s-big").textContent = live ? "EN DIRECTO" : local ? "VISTA PREVIA" : "FUERA DE AIRE";
   $("s-msg").textContent = live ? "emitiendo a YouTube y a la red local"
@@ -1732,11 +1735,19 @@ hacerOrdenable($("tracks"), ".track[data-name]", async filas => {
   knownTracks = ""; refresh();
 });
 
-async function alternarAleatorio() {
-  const activo = !$("q-shuffle").classList.contains("on");
+function pintarAleatorio(id, activo, ahora, luego) {
+  const b = $(id); activo = !!activo;
+  b.classList.toggle("on", activo); b.setAttribute("aria-pressed", String(activo));
+  b.title = activo ? `Modo aleatorio activado: ${ahora} en orden aleatorio. Pulsa para volver al orden de la lista`
+                   : `Activa el modo aleatorio: ${luego} en orden aleatorio`;
+}
+const ALEATORIO_BTN = {video: "q-shuffle", musica: "m-shuffle"};
+async function alternarAleatorio(que) {
+  const activo = !$(ALEATORIO_BTN[que]).classList.contains("on");
+  const nombre = que === "video" ? "los videos" : "la música";
   try {
-    await post("/api/aleatorio", {activo});
-    toast(activo ? "Modo aleatorio activado para videos y música" : "Modo aleatorio desactivado: vuelve el orden de las listas");
+    await post("/api/aleatorio", {que, activo});
+    toast(activo ? `Modo aleatorio activado para ${nombre}` : `Modo aleatorio desactivado para ${nombre}: vuelve el orden de la lista`);
     refresh();
   } catch (e) { toast(e.message, true); }
 }

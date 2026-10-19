@@ -23,7 +23,7 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 import escenas
 import lofigen
 
-VERSION = "2.0"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
+VERSION = "2.1"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
 BASE = Path(__file__).parent
 TRACKS_DIR = BASE / "data" / "tracks"
 VIDEOS_DIR = BASE / "data" / "videos"    # biblioteca de videos + cola
@@ -579,26 +579,40 @@ def api_cola():
     return jsonify(ok=True, cola=nueva)
 
 
-# Modo aleatorio: los alimentadores eligen la siguiente canción y el siguiente video al azar
-# si existe el fichero de control «aleatorio» en su carpeta (se relee antes de cada cambio).
-def aplicar_aleatorio(activo):
-    for d in (TRACKS_DIR, VIDEOS_DIR):
+# Modo aleatorio, independiente para videos y para música: cada alimentador elige el siguiente
+# elemento al azar si existe el fichero de control «aleatorio» en su carpeta (se relee antes de cada cambio).
+ALEATORIO_DIRS = {"video": VIDEOS_DIR, "musica": TRACKS_DIR}
+
+
+def estado_aleatorio(cfg=None):
+    cfg = cfg if cfg is not None else load_config()
+    viejo = bool(cfg.get("aleatorio"))   # ajuste único de versiones anteriores a la 2.1 (valía para ambos)
+    return {k: bool(cfg.get(f"aleatorio_{k}", viejo)) for k in ALEATORIO_DIRS}
+
+
+def aplicar_aleatorio(estado):
+    for que, d in ALEATORIO_DIRS.items():
         marca = d / "aleatorio"
-        if activo:
+        if estado.get(que):
             marca.touch()
         else:
             marca.unlink(missing_ok=True)
 
 
-aplicar_aleatorio(bool(load_config().get("aleatorio")))   # al arrancar, según la configuración guardada
+aplicar_aleatorio(estado_aleatorio())   # al arrancar, según la configuración guardada
 
 
 @app.post("/api/aleatorio")
 def api_aleatorio():
-    activo = bool(request.get_json(force=True).get("activo"))
-    actualizar_config(aleatorio=activo)
-    aplicar_aleatorio(activo)
-    return jsonify(ok=True, aleatorio=activo)
+    data = request.get_json(force=True)
+    que = data.get("que")
+    if que not in ALEATORIO_DIRS:
+        return jsonify(error="indica «que»: video o musica"), 400
+    activo = bool(data.get("activo"))
+    actualizar_config(**{f"aleatorio_{que}": activo})
+    estado = estado_aleatorio()
+    aplicar_aleatorio(estado)
+    return jsonify(ok=True, aleatorio=estado)
 
 
 @app.post("/api/youtube_url")
@@ -918,7 +932,7 @@ def api_state():
                 "inicio": stream["inicio"] if corriendo else 0,
                 "reinicios": watchdog["reinicios"], "ultimo": watchdog["ultimo"]},
         has_key=bool(cfg.get("rtmp_key")),
-        aleatorio=bool(cfg.get("aleatorio")),
+        aleatorio=estado_aleatorio(cfg),
         youtube_url=str(cfg.get("youtube_url") or ""),
         version=VERSION,
         tracks=tracks)
