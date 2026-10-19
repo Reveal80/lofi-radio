@@ -23,8 +23,9 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 
 import escenas
 import lofigen
+import piezas
 
-VERSION = "2.7"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
+VERSION = "2.8"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
 BASE = Path(__file__).parent
 TRACKS_DIR = BASE / "data" / "tracks"
 VIDEOS_DIR = BASE / "data" / "videos"    # biblioteca de videos + cola
@@ -200,17 +201,30 @@ def titulo_random(rng):
     return f"{rng.choice(_T_COSAS).capitalize()} y {rng.choice(_T_COSAS)} {rng.choice(_T_ESTADOS)}"
 
 
-def gen_job(count, estilo="aleatorio", fondo=1.0):
+def gen_job(count, estilo="aleatorio", fondo=1.0, prueba=None):
+    """Compone `count` canciones. prueba=(variedad): modo de prueba del compositor de piezas, tres
+    piezas enteras y contrastadas (perfiles distintos) para comparar."""
     rng = random.Random()
+    lote = piezas.piezas_de_prueba(prueba, estilo) if prueba else None
+    anterior = None
     try:
         for i in range(count):
             titulo = titulo_random(rng)
+            if lote:
+                titulo = f"Prueba {i + 1} de 3 · {piezas.PERFILES[lote[i][1]]['nombre']}"
             mp3 = libre(TRACKS_DIR, titulo, ".mp3", "cancion")
             parcial, wav = mp3.with_suffix(".part"), None
             gen_state["current"] = f"componiendo «{titulo}» ({i + 1}/{count})"
             try:
-                wav, tema = lofigen.generate_random(random.randrange(1, 1_000_000), TRACKS_DIR, estilo, fondo)
-                etiqueta = f"{tema['inst']} · {tema['bat']} · {tema.get('modo', 'mayor')} · {tema['bpm']} bpm"
+                if lote:
+                    seed, perfil = lote[i]
+                    wav, tema = piezas.generate_pieza(seed, TRACKS_DIR, estilo, prueba, perfil, fondo, anterior)
+                    anterior = tema
+                    etiqueta = (f"{tema['perfil_nombre']} · {tema['tono']} · {tema['bpm']} bpm · {tema['inst']} + {tema['instMel']}"
+                                f" · {tema['bat']} · {tema['forma']} · variedad {prueba}")
+                else:
+                    wav, tema = lofigen.generate_random(random.randrange(1, 1_000_000), TRACKS_DIR, estilo, fondo)
+                    etiqueta = f"{tema['inst']} · {tema['bat']} · {tema.get('modo', 'mayor')} · {tema['bpm']} bpm"
                 if estilo != "aleatorio":
                     etiqueta = f"{lofigen.ESTILOS[estilo]['nombre']} · {etiqueta}"
                 subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(wav),
@@ -240,11 +254,15 @@ def api_generate():
     if estilo not in lofigen.ESTILOS:
         return jsonify(error="estilo de música no válido"), 400
     fondo = 0.0 if data.get("sin_fondo") else 1.0   # «Sin ruido de fondo» del panel: quita vinilo/lluvia/cinta
+    prueba = None
+    if data.get("prueba"):   # modo de prueba del compositor de piezas: 3 piezas contrastadas
+        prueba = data.get("variedad") if data.get("variedad") in piezas.VARIEDADES else "medio"
+        count = 3
     with _lock:
         if gen_state["running"]:
             return jsonify(error="ya hay una generación en curso"), 409
         gen_state.update(running=True, done=0, total=count, error="")
-    threading.Thread(target=gen_job, args=(count, estilo, fondo), daemon=True).start()
+    threading.Thread(target=gen_job, args=(count, estilo, fondo, prueba), daemon=True).start()
     return jsonify(ok=True)
 
 
@@ -621,7 +639,7 @@ def api_aleatorio():
 # Radio infinita: música procedural compuesta en tiempo real en vez de la lista (audiofeeder.py).
 INFINITA_FILE = TRACKS_DIR / "infinita.json"
 INFINITA_DEF = {"activo": False, "estilos": ["aleatorio"], "rotar_min": 60, "bpm": 0, "textura": False,
-                "inst_quitar": [], "inst_anadir": [], "melodia": 1,
+                "inst_quitar": [], "inst_anadir": [], "melodia": 1, "variedad": "medio",
                 "inst_aleatorio": False, "melodia_aleatoria": False}   # bpm 0 = automático; melodia 0-3 (1 = de vez en cuando)
 ROTAR_MIN = (0, 15, 30, 60, 120, 240)   # 0 = mezclar los estilos marcados en vez de rotar
 
@@ -640,6 +658,7 @@ def estado_infinita(cfg=None):
         d[k] = [x for x in (d.get(k) or []) if x in lofigen.INST_NOMBRES]
     d["melodia"] = int(d["melodia"]) if str(d.get("melodia")).isdigit() and 0 <= int(d["melodia"]) <= 3 else 1
     d["inst_aleatorio"], d["melodia_aleatoria"] = bool(d.get("inst_aleatorio")), bool(d.get("melodia_aleatoria"))
+    d["variedad"] = d.get("variedad") if d.get("variedad") in piezas.VARIEDADES else "medio"   # cuánto se separan las piezas
     d["inst_estilo"] = lofigen.instrumentos_de(d["estilos"])   # los que usarían los estilos marcados (informativo)
     d["instrumentos"] = lofigen.INST_NOMBRES
     return d
@@ -679,6 +698,10 @@ def api_infinita():
         if data["melodia"] not in (0, 1, 2, 3):
             return jsonify(error="nivel de melodía no válido"), 400
         d["melodia"] = int(data["melodia"])
+    if "variedad" in data:
+        if data["variedad"] not in piezas.VARIEDADES:
+            return jsonify(error="variedad no válida (bajo, medio o alto)"), 400
+        d["variedad"] = str(data["variedad"])
     for k in ("inst_quitar", "inst_anadir"):
         if k in data:
             lista = data[k] or []

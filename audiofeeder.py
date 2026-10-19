@@ -11,11 +11,13 @@ Ficheros de control (en la carpeta de canciones):
   actual.json  canción que suena ahora (la escribe este proceso)
   saltar       si existe, pasa a la siguiente canción y lo borra
   aleatorio    si existe, la siguiente canción se elige al azar (modo aleatorio del panel)
-  infinita.json  {"activo", "estilos", "rotar_min", "bpm", "textura"}: radio infinita. Si está activa, en vez de la lista
-               se compone música procedural en tiempo real (lofigen.tema_siguiente) por tramos de
-               16 compases que se superponen (la resonancia de uno sobre el principio del siguiente).
+  infinita.json  {"activo", "estilos", "rotar_min", "bpm", "textura", "variedad"…}: radio infinita. Si está activa,
+               en vez de la lista se compone música procedural en tiempo real: piezas de 3 a 6 minutos
+               (piezas.Compositor) emitidas sección a sección (intro, A, B, descanso, cierre…); los tramos
+               se superponen (la resonancia de uno sobre el principio del siguiente).
                El render corre en un proceso aparte para no retrasar nunca la salida de audio.
-               Cambiar estilo o tempo, o «saltar», pide un tramo nuevo y corta al siguiente compás.
+               Cambiar estilo o tempo pide una pieza nueva que continúa en la misma tonalidad y tempo;
+               «saltar» pasa a otra pieza. memoria.json guarda las huellas de las piezas recientes.
 """
 import json
 import multiprocessing
@@ -108,21 +110,23 @@ def reproducir(p):
 # ── radio infinita ──
 
 def _render_worker(req, res):
-    """Proceso aparte: compone y renderiza tramos a petición (numpy/scipy no frenan la salida)."""
+    """Proceso aparte: compone y renderiza secciones a petición (numpy/scipy no frenan la salida).
+    El compositor guarda la pieza en curso y la memoria de piezas recientes."""
+    import traceback
     import numpy as np
-    import lofigen
+    import piezas
+    comp = piezas.Compositor(str(D / "memoria.json"))
     while True:
         item = req.get()
         if item is None:
             return
-        rid, prev, estilo, bpm, fondo, opc, seed = item
+        rid, _prev, estilo, bpm, fondo, opc, seed = item
         try:
-            tema = lofigen.tema_siguiente(prev, seed, estilo, bpm or None, tuple(opc.get("quitar", ())), tuple(opc.get("anadir", ())),
-                                          int(opc.get("melodia", 1)), False, bool(opc.get("minimo")))
-            cuerpo, cola = lofigen.render_theme(tema, 1, seed, continuo=True, fondo=fondo)
-            res.put((rid, tema, cuerpo.astype(np.float32), cola.astype(np.float32)))
+            info, cuerpo, cola = comp.tramo(estilo, bpm, fondo, opc, seed)
+            res.put((rid, info, cuerpo.astype(np.float32), cola.astype(np.float32)))
         except Exception as e:   # un tramo fallido no tumba la radio: se pide otro
-            print(f"radio infinita: error al componer: {e}", file=sys.stderr)
+            print(f"radio infinita: error al componer: {e}\n{traceback.format_exc()}", file=sys.stderr)
+            comp.pieza = None
             res.put((rid, None, None, None))
 
 
@@ -238,7 +242,7 @@ def tocar_infinita(cfg):
             melodia = nivel
         else:
             azar["mel"] = (None, 0)
-        return {"quitar": quitar, "anadir": anadir, "melodia": melodia}
+        return {"quitar": quitar, "anadir": anadir, "melodia": melodia, "variedad": str(c.get("variedad") or "medio")}
     radio.pedir(estilo, bpm, fondo(cfg), inst(cfg))
     paso = SR // 10                                    # 0,1 s por escritura
     fon, ins = fondo(cfg), inst(cfg)
@@ -285,7 +289,7 @@ def tocar_infinita(cfg):
                                           "mezcla": "+" in estilo, "solo": bool(tema.get("solo_melodia")),
                                           "azar_inst": list(azar["inst"][0] or []), "azar_inst_hasta": azar["inst"][1],
                                           "azar_mel": azar["mel"][0], "azar_mel_hasta": azar["mel"][1],
-                                          "melodia": ins["melodia"],
+                                          "melodia": ins["melodia"], "pieza": tema.get("pieza"),
                                           "rota_en": (desde + rotar_min * 60) if len(estilos) > 1 and "+" not in estilo else 0}})
             estilo, desde = estilo_sig, desde_sig
             pos, ultimo, corte_en, nuevo, suave = 0, time.time(), None, None, False
@@ -303,14 +307,19 @@ def tocar_infinita(cfg):
                     e2, desde = _elegir_estilo(cfg, estilo, desde, False)
                     b2, f2, i2 = int(cfg.get("bpm") or 0), fondo(cfg), inst(cfg)
                     salto = SALTAR.exists()
-                    if (e2, b2, f2, i2) != (estilo, bpm, fon, ins) or salto:
+                    fuerte = lambda d: {k: v for k, v in d.items() if k not in ("melodia", "variedad")}
+                    if (e2, b2, f2, fuerte(i2)) != (estilo, bpm, fon, fuerte(ins)) or salto:
                         SALTAR.unlink(missing_ok=True)
                         estilo, bpm, fon, ins = e2, b2, f2, i2
-                        # cambio pedido: tramo «mínimo» (solo cambia lo tocado) que entra al acabar la frase
-                        # de 4 compases, con fundido largo; «saltar» sí corta al compás siguiente
+                        # cambio pedido (estilo, instrumentos, tempo): pieza nueva que continúa en la misma
+                        # tonalidad y tempo, y entra al acabar la frase de 4 compases con fundido largo;
+                        # «saltar» pasa a otra pieza y corta al compás siguiente
                         suave = not salto
-                        radio.pedir(estilo, bpm, fon, {**ins, "minimo": suave})
+                        radio.pedir(estilo, bpm, fon, {**ins, "minimo": suave, "salto": salto})
                         nuevo = False                  # esperando el tramo con los ajustes nuevos
+                    elif i2 != ins:                    # solo melodía o variedad: la sección en curso sigue;
+                        ins = i2                       # la siguiente se rehace con los ajustes nuevos
+                        radio.pedir(estilo, bpm, fon, {**ins, "rehacer": True})
                 if nuevo is False:
                     r = radio.recoger()
                     if r is not None:

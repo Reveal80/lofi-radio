@@ -692,6 +692,10 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z"/><path d="M19 17v4M17 19h4"/></svg>
             Componer
           </button>
+          <button id="g-prueba" class="btn" onclick="generarPrueba()" title="Modo de prueba del compositor de piezas de la radio infinita: tres piezas enteras (3 a 6 min) de perfiles distintos, con la variedad elegida en la radio infinita, para escucharlas y compararlas">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h3l3-8 4 16 3-8h5"/></svg>
+            3 piezas de prueba
+          </button>
         </div>
         <div class="progress" id="g-prog" style="margin-top:16px"><i></i></div>
         <div class="status-line"><span id="g-status"></span><span id="g-frac"></span></div>
@@ -795,6 +799,7 @@
           <div class="inf-rota" id="inf-rota" hidden><span>Con varios estilos:</span><button class="chip" data-min="0" title="Un solo estilo que suma los marcados: instrumentos, ritmos y tempos de todos ellos">Mezclar</button><span style="color:var(--dim)">o cambiar cada</span><button class="chip" data-min="15">15 min</button><button class="chip" data-min="30">30 min</button><button class="chip" data-min="60">1 h</button><button class="chip" data-min="120">2 h</button><button class="chip" data-min="240">4 h</button><small id="inf-rota-txt"></small></div>
           <div class="inf-inst"><span title="Los del estilo van marcados; pulsa uno para quitarlo o para añadir otro. Entra en el siguiente tramo">Instrumentos</span><div class="chips" id="inf-inst-chips"><small id="inf-inst-nota" style="width:100%;order:100;font:11px var(--mono);color:var(--ok)"></small><button class="chip rnd" id="inf-inst-rnd" onclick="alternarAzar('inst_aleatorio')" aria-label="aleatorio" title="Sortea una combinación de 2 a 4 instrumentos (sin los que hayas quitado) y cambiará cada 30 minutos"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button></div></div>
           <div class="inf-rota" id="inf-mel"><span title="Cuántos compases llevan melodía; el resto son acordes y bajo">Melodía</span><button class="chip" data-mel="0">ninguna</button><button class="chip" data-mel="1">de vez en cuando</button><button class="chip" data-mel="2">normal</button><button class="chip" data-mel="3">continua</button><button class="chip rnd" id="inf-mel-rnd" onclick="alternarAzar('melodia_aleatoria')" aria-label="aleatorio" title="Sortea un nivel de melodía y cambiará cada 30 minutos"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button></div>
+          <div class="inf-rota" id="inf-var"><span title="Cuánto se separan unas piezas de otras: tonalidad, tempo, estructura, variaciones de la melodía y cambios de instrumento. Afecta a cómo se compone, no a cuántas notas hay">Variedad</span><button class="chip" data-var="bajo" title="Piezas parecidas entre sí: tonalidades vecinas, tempo casi fijo, forma sencilla (intro, A, B, A, cierre), pocas variaciones">baja</button><button class="chip" data-var="medio" title="Equilibrado: descansos y puentes, variaciones del motivo, algún cambio de timbre en la B">media</button><button class="chip" data-var="alto" title="Cada pieza se va lejos: cualquier tonalidad y tempo, secciones B en el relativo, más variaciones y cambios de instrumento">alta</button></div>
           <div class="inf-tempo">
             <span>Tempo</span><span class="lim">50</span>
             <input type="range" id="inf-bpm" min="50" max="110" step="1" value="76" aria-label="tempo en bpm">
@@ -1638,6 +1643,14 @@ async function generar() {
   refresh();
 }
 
+async function generarPrueba() {
+  $("g-err").textContent = "";
+  const variedad = infinita?.variedad || "medio";
+  try { await post("/api/generate", {prueba: true, estilo: estiloMusica, variedad, sin_fondo: $("g-sinfondo").checked}); toast(`Componiendo 3 piezas de prueba contrastadas (variedad ${variedad})… tardan un par de minutos`); }
+  catch (e) { $("g-err").textContent = e.message; }
+  refresh();
+}
+
 async function borrar(name) {
   const t = tracks[name];
   if (!await confirmar("¿Borrar pista?", `«${t ? t.title : name}» se eliminará del servidor.`, "Borrar", true)) return;
@@ -1829,12 +1842,21 @@ function tickCola() {
   $("m-live").classList.toggle("on", !!mu.name);
   $("m-skip").disabled = !s.stream.running;
   if (mu.infinita) {
-    const i = mu.infinita, pas = Date.now() / 1000 - mu.inicio, dur = mu.dur || 0;
-    $("m-live-t").textContent = `Radio infinita · ${i.estilo_nombre} · ${i.bpm} bpm`;
-    $("m-live-r").textContent = i.solo ? `tramo ${i.n} · ${fmt(Math.min(pas, dur))} / ${fmt(dur)} · solo melodía (${i.instMel}), sin acordes, bajo ni batería`
-                                       : `tramo ${i.n} · ${fmt(Math.min(pas, dur))} / ${fmt(dur)} · ${i.inst} + ${i.instMel} · batería ${i.bat} · ${i.modo}`;
-    $("m-live-bar").style.width = dur ? Math.min(100, pas / dur * 100) + "%" : "0";
-    $("inf-now").textContent = (i.cambios?.length ? "cambió: " + i.cambios.join(", ") : "");
+    const i = mu.infinita, pas = Date.now() / 1000 - mu.inicio, dur = mu.dur || 0, pz = i.pieza;
+    if (pz) {   // compositor de piezas (2.8): pieza, sección y posición dentro de la pieza
+      const pos = Math.min(pz.antes + pas, pz.dur);
+      $("m-live-t").textContent = `Radio infinita · ${i.estilo_nombre} · ${pz.perfil_nombre} · ${pz.tono} · ${i.bpm} bpm`;
+      $("m-live-r").textContent = i.solo ? `pieza ${pz.n} · ${pz.seccion} (${pz.idx}/${pz.total}) · ${fmt(pos)} / ${fmt(pz.dur)} · solo melodía (${i.instMel})`
+        : `pieza ${pz.n} · ${pz.seccion} (${pz.idx}/${pz.total}) · ${fmt(pos)} / ${fmt(pz.dur)} · ${i.inst} + ${i.instMel}${pz.capa ? " + " + pz.capa : ""} · batería ${i.bat} · bajo ${pz.bajo}`;
+      $("m-live-bar").style.width = pz.dur ? Math.min(100, pos / pz.dur * 100) + "%" : "0";
+      $("inf-now").textContent = `forma ${pz.forma} · armonía ${pz.familia} · variedad ${pz.variedad}`;
+    } else {
+      $("m-live-t").textContent = `Radio infinita · ${i.estilo_nombre} · ${i.bpm} bpm`;
+      $("m-live-r").textContent = i.solo ? `tramo ${i.n} · ${fmt(Math.min(pas, dur))} / ${fmt(dur)} · solo melodía (${i.instMel}), sin acordes, bajo ni batería`
+                                         : `tramo ${i.n} · ${fmt(Math.min(pas, dur))} / ${fmt(dur)} · ${i.inst} + ${i.instMel} · batería ${i.bat} · ${i.modo}`;
+      $("m-live-bar").style.width = dur ? Math.min(100, pas / dur * 100) + "%" : "0";
+      $("inf-now").textContent = (i.cambios?.length ? "cambió: " + i.cambios.join(", ") : "");
+    }
   } else if (mu.name) {
     const pas = Date.now() / 1000 - mu.inicio, dur = mu.dur || t?.dur || 0;
     $("m-live-t").textContent = t ? t.title : mu.name;
@@ -2031,7 +2053,7 @@ function pintarInfinita(d, estilos) {
                               : "Radio infinita: compone música lofi en tiempo real, sin fin y sin usar la lista";
   $("inf-panel").hidden = !d.activo;
   $("m-shuffle").disabled = d.activo;
-  $("m-skip").title = d.activo ? "Pasa al siguiente tramo de la radio infinita (en el siguiente compás)" : "Pasa a otra canción en el directo sin cortar la emisión";
+  $("m-skip").title = d.activo ? "Pasa a otra pieza de la radio infinita (en el siguiente compás)" : "Pasa a otra canción en el directo sin cortar la emisión";
   if (!$("inf-estilos").childElementCount && estilos)
     $("inf-estilos").innerHTML = Object.entries(estilos).map(([k, e]) =>
       `<button class="escena" data-estilo="${esc(k)}" title="${esc(e.desc)}"><span class="em">${ICONO_ESTILO[k] || ICONO_ESTILO.jazz}</span><span class="en">${esc(e.nombre)}</span></button>`).join("");
@@ -2048,6 +2070,7 @@ function pintarInfinita(d, estilos) {
   const nivelMel = d.melodia_aleatoria ? (i?.azar_mel ?? null) : (d.melodia ?? 1);
   document.querySelectorAll("#inf-mel .chip[data-mel]").forEach(c => c.classList.toggle("on", +c.dataset.mel === nivelMel));
   $("inf-mel-rnd").classList.toggle("on", !!d.melodia_aleatoria);
+  document.querySelectorAll("#inf-var .chip[data-var]").forEach(c => c.classList.toggle("on", c.dataset.var === (d.variedad || "medio")));
   $("inf-mel-rnd").title = d.melodia_aleatoria ? `Melodía al azar: ${minutos(i?.azar_mel_hasta)}. Pulsa para volver al nivel fijo` : "Sortea un nivel de melodía y cambiará cada 30 minutos";
   $("inf-inst-rnd").classList.toggle("on", !!d.inst_aleatorio);
   $("inf-inst-rnd").title = d.inst_aleatorio ? `Instrumentos al azar: ${minutos(i?.azar_inst_hasta)}. Pulsa para volver a los del estilo` : "Sortea una combinación de 2 a 4 instrumentos (sin los que hayas quitado) y cambiará cada 30 minutos";
@@ -2107,6 +2130,10 @@ function alternarAzar(k) {
 $("inf-mel").addEventListener("click", e => {
   const c = e.target.closest(".chip[data-mel]"); if (!c) return;
   ajustarInfinita({melodia: +c.dataset.mel, melodia_aleatoria: false}, `Melodía: ${c.textContent} (entra en el siguiente tramo)`);
+});
+$("inf-var").addEventListener("click", e => {
+  const c = e.target.closest(".chip[data-var]"); if (!c) return;
+  ajustarInfinita({variedad: c.dataset.var}, `Variedad ${c.textContent}: se aplica a la siguiente pieza`);
 });
 $("inf-rota").addEventListener("click", e => {
   const c = e.target.closest(".chip"); if (!c) return;

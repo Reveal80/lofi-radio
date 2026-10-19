@@ -68,7 +68,7 @@ def reverb(x, mezcla, cola):
 
 
 def add(buf, x, start):
-    i = int(start * SR)
+    i = max(0, int(start * SR))   # la humanización puede adelantar una nota del primer compás por debajo de 0
     end = min(i + len(x), len(buf))
     if end > i:
         buf[i:end] += x[:end - i]
