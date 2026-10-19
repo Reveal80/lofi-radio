@@ -211,12 +211,14 @@ def segundo_en_negro():
         time.sleep(1 / FPS)
 
 
-# Neblina: Perlin pequeño (288x108 a 8 fps, barato) con umbral para que haya claros y bancos,
-# vaivén lento por recorte (sin costura), escalado a 1080p y mezcla «screen» solo en luma.
-# Cuesta ~0,5 núcleos más que decodificar a secas; por eso es por video y opcional.
-NIEBLA = ("perlin=s=288x108:r=8:octaves=3:persistence=.55:xscale=.5:yscale=.5:tscale=.04,"
-          f"fps={FPS},lutyuv=y=clip((val-80)*2.2\\,0\\,255),crop=192:108:x=48*(1+sin(t/23)):y=0,"
-          f"scale={W}:{H}:flags=fast_bilinear,format=gray,format=yuv420p")
+# Neblina, muy sutil (el usuario la quiere «como el humo del tabaco»): Perlin pequeño estirado en
+# vertical (hilos), umbral alto para que solo queden los filamentos, vaivén lento por recorte (sin
+# costura), escalado a 1080p y mezcla «screen» solo en luma a poca opacidad. ~0,5 núcleos más que
+# decodificar a secas; por eso es por video y opcional.
+NIEBLA = ("perlin=s=256x216:r=8:octaves=4:persistence=.6:xscale=1.4:yscale=.45:tscale=.05,"
+          f"fps={FPS},lutyuv=y=clip((val-134)*7\\,0\\,255),crop=192:108:x=32*(1+sin(t/41)):y=54*(1-sin(t/29)),"
+          f"scale={W}:{H}:flags=bilinear,format=gray,format=yuv420p")
+NIEBLA_OPACIDAD = .2
 
 
 def reproducir(item):
@@ -228,8 +230,11 @@ def reproducir(item):
     if niebla:
         cmd = ["ffmpeg", "-v", "error", "-re", "-stream_loop", "-1", "-i", str(D / item["video"]),
                "-f", "lavfi", "-i", NIEBLA, "-filter_complex",
-               f"[0:v]{vf}[b];[1:v][b]blend=c0_mode=screen:c0_opacity=.4:c1_mode=normal:c1_opacity=0:"
-               f"c2_mode=normal:c2_opacity=0,format=yuv420p", "-an", "-f", "rawvideo", "-"]
+               # ojo con blend: la opacidad mezcla entre la capa de ARRIBA (primera entrada) y el resultado,
+               # así que el video va primero: luma = video + (screen(video, humo) - video) * opacidad;
+               # el croma se queda tal cual (modo normal con opacidad 1 = capa de arriba)
+               f"[0:v]{vf}[b];[b][1:v]blend=c0_mode=screen:c0_opacity={NIEBLA_OPACIDAD}:c1_mode=normal:c1_opacity=1:"
+               f"c2_mode=normal:c2_opacity=1,format=yuv420p", "-an", "-f", "rawvideo", "-"]
     else:
         cmd = ["ffmpeg", "-v", "error", "-re", "-stream_loop", "-1", "-i", str(D / item["video"]),
                "-an", "-vf", vf, "-f", "rawvideo", "-"]
