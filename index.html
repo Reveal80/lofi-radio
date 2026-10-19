@@ -904,7 +904,7 @@
     <section class="sx-sec">
       <h3>Procesos del contenedor <small id="sx-p-info"></small></h3>
       <div class="sx-grid"><div class="sx wide" style="padding:8px 14px">
-        <table class="sx-tab"><thead><tr><th>proceso</th><th class="num">pid</th><th class="num">cpu</th><th class="num">memoria</th></tr></thead><tbody id="sx-procs"></tbody></table>
+        <table class="sx-tab"><thead><tr><th>proceso</th><th class="num">pid</th><th class="num" title="porcentaje sobre todos los núcleos del servidor">cpu</th><th class="num">memoria</th></tr></thead><tbody id="sx-procs"></tbody></table>
       </div></div>
     </section>
   </div>
@@ -1364,8 +1364,8 @@ function pintarStats(x) {
     : g.tarjetas.length ? "Solo hay una salida de pantalla, sin nodo de render: esta gráfica no puede codificar video (habitual en máquinas virtuales)."
     : "Para cederla al contenedor, descomenta el bloque «GPU integrada» del docker-compose.yml.";
   // procesos
-  $("sx-procs").innerHTML = x.procesos.map(pr => `<tr><td title="${pr.nombre}">${pr.nombre}</td><td class="num">${pr.pid}</td><td class="num">${pr.cpu_pct.toFixed(1)} %</td><td class="num">${fmtB(pr.rss)}</td></tr>`).join("");
-  $("sx-p-info").textContent = `los ${x.procesos.length} que más CPU usan`;
+  $("sx-procs").innerHTML = x.procesos.map(pr => `<tr><td title="${pr.nombre}">${pr.nombre}</td><td class="num">${pr.pid}</td><td class="num" title="${pr.cpu_pct.toFixed(0)} % de un núcleo">${(pr.cpu_pct / c.ncpu).toFixed(1)} %</td><td class="num">${fmtB(pr.rss)}</td></tr>`).join("");
+  $("sx-p-info").textContent = `los ${x.procesos.length} que más CPU usan · % sobre los ${c.ncpu} núcleos`;
   $("sx-upd").textContent = "actualizado " + new Date().toLocaleTimeString("es-ES");
 }
 async function cargarStats() {
