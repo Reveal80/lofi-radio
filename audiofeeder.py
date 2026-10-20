@@ -54,17 +54,21 @@ def duracion(p):
 
 
 _infinita_cache = None
+_infinita_mtime = None
 
 
 def leer_infinita():
-    """Ajustes de la radio infinita si está activa; None si toca la lista.
+    """Ajustes de la radio infinita si está activa; None si toca la lista. Solo se vuelve a leer el
+    fichero si ha cambiado su fecha (se consulta hasta 10 veces por segundo).
     Si el fichero no se puede leer en ese instante, vale lo último leído."""
-    global _infinita_cache
+    global _infinita_cache, _infinita_mtime
     try:
-        d = json.loads(INFINITA.read_text())
-        _infinita_cache = d if d.get("activo") else None
+        m = INFINITA.stat().st_mtime_ns
+        if m != _infinita_mtime:
+            d = json.loads(INFINITA.read_text())
+            _infinita_cache, _infinita_mtime = (d if d.get("activo") else None), m
     except FileNotFoundError:
-        _infinita_cache = None
+        _infinita_cache = _infinita_mtime = None
     except Exception:
         pass
     return _infinita_cache
@@ -120,7 +124,7 @@ def _render_worker(req, res):
         item = req.get()
         if item is None:
             return
-        rid, _prev, estilo, bpm, fondo, opc, seed = item
+        rid, estilo, bpm, fondo, opc, seed = item
         try:
             info, cuerpo, cola = comp.tramo(estilo, bpm, fondo, opc, seed)
             res.put((rid, info, cuerpo.astype(np.float32), cola.astype(np.float32)))
@@ -133,7 +137,6 @@ def _render_worker(req, res):
 class RadioInfinita:
     def __init__(self):
         self.proc = self.req = self.res = None
-        self.tema = None          # último tramo compuesto (el siguiente hereda de él)
         self.n = 0                # tramos emitidos
         self.rid = 0              # id de la última petición (los resultados viejos se descartan)
         self.seed = random.randrange(1 << 30)
@@ -151,13 +154,12 @@ class RadioInfinita:
             self.proc.terminate()
             self.proc.join(2)
         self.proc = None
-        self.tema = None
 
     def pedir(self, estilo, bpm, fondo=0, opc=None):
         self.arrancar()
         self.rid += 1
         self.seed += 1
-        self.req.put((self.rid, self.tema, estilo, int(bpm or 0), float(fondo), dict(opc or {}), self.seed))
+        self.req.put((self.rid, estilo, int(bpm or 0), float(fondo), dict(opc or {}), self.seed))
 
     def recoger(self, timeout=0):
         """El tramo de la última petición si ya está (tema, cuerpo, cola); None si no."""
@@ -169,7 +171,6 @@ class RadioInfinita:
                     continue
                 if tema is None:
                     return None
-                self.tema = tema
                 return tema, cuerpo, cola
         except queue.Empty:
             return None
@@ -188,7 +189,7 @@ def _a_pcm(mono):
 def _elegir_estilo(cfg, actual, desde, rotar):
     """Estilo que toca según la selección (varios = rotación cada rotar_min minutos, en el orden
     de la lista). Si el actual ya no está marcado, pasa al primero. Devuelve (estilo, desde)."""
-    estilos = [e for e in (cfg.get("estilos") or [cfg.get("estilo") or "aleatorio"]) if e]
+    estilos = [e for e in (cfg.get("estilos") or ["aleatorio"]) if e]
     if len(estilos) > 1 and not int(cfg.get("rotar_min") or 0):   # rotar_min 0 = mezclar los estilos
         return "+".join(estilos), desde or time.time()
     if actual not in estilos:
@@ -243,9 +244,9 @@ def tocar_infinita(cfg):
         else:
             azar["mel"] = (None, 0)
         return {"quitar": quitar, "anadir": anadir, "melodia": melodia, "variedad": str(c.get("variedad") or "medio")}
-    radio.pedir(estilo, bpm, fondo(cfg), inst(cfg))
-    paso = SR // 10                                    # 0,1 s por escritura
     fon, ins = fondo(cfg), inst(cfg)
+    radio.pedir(estilo, bpm, fon, ins)
+    paso = SR // 10                                    # 0,1 s por escritura
     entrada_suave = False                              # el próximo tramo entra con fundido (cambio pedido)
     siguiente = None                                   # tramo ya recogido que entra en el corte
     try:
@@ -282,14 +283,13 @@ def tocar_infinita(cfg):
             escribir_actual({"name": "radio-infinita", "inicio": time.time(), "dur": len(cuerpo) / SR,
                              "infinita": {"n": radio.n, "estilo": estilo,
                                           "estilo_nombre": " + ".join(nombres.get(x, x) for x in estilo.split("+")),
-                                          "estilos": estilos, "bpm": tema["bpm"], "inst": tema.get("inst"),
+                                          "bpm": tema["bpm"], "inst": tema.get("inst"),
                                           "instMel": tema.get("instMel"), "bat": tema.get("bat"), "modo": tema.get("modo"),
-                                          "tex": tema.get("tex"), "cambios": tema.get("cambios", []),
                                           "siguiente": estilo_sig if estilo_sig != estilo else None,
-                                          "mezcla": "+" in estilo, "solo": bool(tema.get("solo_melodia")),
+                                          "solo": bool(tema.get("solo_melodia")),
                                           "azar_inst": list(azar["inst"][0] or []), "azar_inst_hasta": azar["inst"][1],
                                           "azar_mel": azar["mel"][0], "azar_mel_hasta": azar["mel"][1],
-                                          "melodia": ins["melodia"], "pieza": tema.get("pieza"),
+                                          "pieza": tema.get("pieza"),
                                           "rota_en": (desde + rotar_min * 60) if len(estilos) > 1 and "+" not in estilo else 0}})
             estilo, desde = estilo_sig, desde_sig
             pos, ultimo, corte_en, nuevo, suave = 0, time.time(), None, None, False
@@ -355,8 +355,9 @@ def main():
     actual, pos = None, 0
     escribir_actual({})
     while True:
-        if leer_infinita():
-            tocar_infinita(leer_infinita())
+        cfg = leer_infinita()
+        if cfg:
+            tocar_infinita(cfg)
             actual = None
             continue
         pistas = en_orden()

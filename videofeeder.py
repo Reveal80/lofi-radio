@@ -48,12 +48,20 @@ def escribir_actual(datos):
     tmp.replace(ACTUAL)
 
 
+_infinita_cache = (None, None)   # (mtime_ns, ajustes): solo se relee el fichero si cambia su fecha
+
+
 def leer_infinita():
-    """Ajustes del video infinito si está activo; None si toca la cola."""
+    """Ajustes del video infinito si está activo; None si toca la cola (o no se puede leer)."""
+    global _infinita_cache
     try:
-        d = json.loads(INFINITA.read_text())
-        return d if d.get("activo") else None
+        m = INFINITA.stat().st_mtime_ns
+        if m != _infinita_cache[0]:
+            d = json.loads(INFINITA.read_text())
+            _infinita_cache = (m, d if d.get("activo") else None)
+        return _infinita_cache[1]
     except Exception:
+        _infinita_cache = (None, None)
         return None
 
 
@@ -78,8 +86,15 @@ COLORES = {   # RGB de la cabeza de color (la cola se apaga hacia negro)
 }
 
 
+_glifos_cache = None   # el atlas no cambia: ffmpeg se lanza una sola vez por proceso
+_atlas_cache = {}      # (Y, U, V) por color RGB (~3 MB cada uno): encender/apagar o cambiar de color no recalcula
+
+
 def _glifos_np():
     """Atlas (n, 24, 16) float 0..1: todos los glifos en una sola llamada a ffmpeg, más espejos."""
+    global _glifos_cache
+    if _glifos_cache is not None:
+        return _glifos_cache
     import numpy as np
     n = len(GLIFOS)
     esc = lambda c: c.replace("\\", "\\\\").replace(":", "\\:")   # «:» separa opciones del filtro
@@ -92,11 +107,14 @@ def _glifos_np():
     tira = np.frombuffer(r.stdout, dtype=np.uint8).reshape(CH, n * CW)
     g = [tira[:, i * CW:(i + 1) * CW] for i in range(n)]
     g += [x[:, ::-1] for x, (c, _) in zip(g, GLIFOS) if c.isalpha()]   # espejados, como en la película
-    return np.stack(g).astype(np.float32) / 255
+    _glifos_cache = np.stack(g).astype(np.float32) / 255
+    return _glifos_cache
 
 
 def _atlas(glifos, rgb):
     """Atlas Y/U/V uint8 (niveles+1, n, alto, ancho) para un color (BT.601, rango limitado)."""
+    if rgb in _atlas_cache:
+        return _atlas_cache[rgb]
     import numpy as np
     r, g, b = rgb
     yc, uc, vc = 16 + (65.481 * r + 128.553 * g + 24.966 * b) / 255, 128 + (-37.797 * r - 74.203 * g + 112 * b) / 255, \
@@ -114,7 +132,8 @@ def _atlas(glifos, rgb):
     Y[NIVELES] = 16 + 219 * glifos   # cabeza: blanca
     U[NIVELES] = 128
     V[NIVELES] = 128
-    return Y, U, V
+    _atlas_cache[rgb] = (Y, U, V)
+    return _atlas_cache[rgb]
 
 
 def tocar_matrix(cfg):
@@ -186,7 +205,7 @@ def tocar_matrix(cfg):
                 c2 = leer_infinita()
                 if not c2:
                     return
-                v_ant, p_ant = velocidad, pausa
+                p_ant = pausa
                 velocidad, cantidad, cps, decay, pausa = ajustar(c2)
                 if pausa != p_ant:                          # la cantidad cambia ya: reescala las esperas
                     espera *= pausa / p_ant

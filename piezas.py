@@ -195,10 +195,10 @@ def _conducir(tonica, prog, centro):
     también sea suave. Devuelve [(raíz midi para el bajo, [notas midi], pcs)]."""
     prev = None
     out = []
-    for vuelta in range(2):
+    for _ in range(2):
         out = []
         for g, q in prog:
-            root, pcs = _pcs(tonica, g, q)
+            _, pcs = _pcs(tonica, g, q)
             notas = _voicing(pcs, prev, centro)
             r = tonica + g
             while r > 62:
@@ -270,7 +270,7 @@ def _variar(rng, m, tipo):
     return v
 
 
-def _realizar(frase, esc, centro_idx, acordes2, tonica, final, techo):
+def _realizar(frase, esc, centro_idx, acordes2, final, techo):
     """Pasa un motivo (pasos de escala) a notas MIDI sobre los acordes de sus dos compases:
     los tiempos fuertes caen en notas del acorde; la última nota resuelve según `final`
     («pregunta»: nota del acorde que no sea la raíz; «respuesta»: raíz o tercera)."""
@@ -307,15 +307,14 @@ def _realizar(frase, esc, centro_idx, acordes2, tonica, final, techo):
 # estructura: plan de secciones con capas e intención
 # ══════════════════════════════════════════════════════════════════════════════════════════════
 
-def _planificar(rng, V, compases_objetivo, perfil, menor):
+def _planificar(rng, V, compases_objetivo):
     forma = list(V["formas"][int(rng.integers(len(V["formas"])))])
     secciones = []
-    nA = 0
     for i, tipo in enumerate(forma):
         if tipo == "intro":
             n = int(rng.choice([2, 4, 4]))
         elif tipo == "A":
-            n = int(rng.choice(V["largosA"])); nA += 1
+            n = int(rng.choice(V["largosA"]))
         elif tipo == "B":
             n = int(rng.choice(V["largosB"]))
         elif tipo == "descanso":
@@ -482,8 +481,6 @@ def componer(seed, estilo="aleatorio", E=None, variedad="medio", bpm=0, melodia=
         tonica -= 12
     # tempo: el pedido, o dentro del estilo/perfil con un salto acotado respecto a la pieza anterior
     lo, hi = (int(x) for x in E.get("bpm", P["bpm"]))
-    if E.get("bpm") is None:
-        lo, hi = P["bpm"]
     if bpm:
         tempo = int(bpm)
     else:
@@ -498,11 +495,12 @@ def componer(seed, estilo="aleatorio", E=None, variedad="medio", bpm=0, melodia=
     instMel = _pref(rng, P["instMel"], E.get("instMel", L.TODOS["instMel"]), evitar=(inst,))
     # capas: cuántos instrumentos a la vez (2 acordes+melodía, 3 +notas guía, 4 +arpegio/contracanto)
     admitidos = set(E.get("inst", L.TODOS["inst"])) | set(E.get("instMel", L.TODOS["instMel"]))
-    capa_opts = [x for x in P["capa"] + list(admitidos) if x not in (inst, instMel) and x in admitidos and x in L.INST]
+    # (sorted: el orden de un set de cadenas cambia con el hash de cada proceso y la pieza dejaba de ser reproducible)
+    capa_opts = [x for x in P["capa"] + sorted(admitidos) if x not in (inst, instMel) and x in admitidos and x in L.INST]
     if not capas or len(admitidos) > 4:   # sin acotar (estilo aleatorio o muchos activos): 3 o 4 según la pieza
         capas = int(rng.choice([3, 3, 4]))
     capa = str(rng.choice(capa_opts[:3])) if capa_opts and capas >= 3 else None
-    inst2_opts = [x for x in P["inst"] + P["instMel"] + list(admitidos) if x not in (inst, instMel, capa, "pad") and x in admitidos and x in L.INST]
+    inst2_opts = [x for x in P["inst"] + P["instMel"] + sorted(admitidos) if x not in (inst, instMel, capa, "pad") and x in admitidos and x in L.INST]
     inst2 = str(rng.choice(inst2_opts[:3])) if inst2_opts and capas >= 4 else None
     groove = _pref(rng, P["grooves"], E.get("bat", L.TODOS["bat"]))
     comp = _pref(rng, P["comp"], E.get("comp", L.TODOS["comp"]))
@@ -546,7 +544,7 @@ def componer(seed, estilo="aleatorio", E=None, variedad="medio", bpm=0, melodia=
     # duración y plan
     dur_min = float(rng.uniform(*P["dur"]))
     compas_s = 240 / tempo
-    secciones = _planificar(rng, V, dur_min * 60 / compas_s, P, menor)
+    secciones = _planificar(rng, V, dur_min * 60 / compas_s)
     if continuar:
         secciones[0]["compases"] = 2
     if solo:
@@ -564,7 +562,7 @@ def componer(seed, estilo="aleatorio", E=None, variedad="medio", bpm=0, melodia=
         bpm=tempo, sw=sw, tonica=tonica, modo="menor" if menor else "mayor", tono=_nombre_tono(tonica, menor),
         inst=inst, instMel=instMel, instMelB=instMelB, capa=capa, inst2=inst2, capas=int(capas), bat=groove, comp=comp, bajo=bajo, bajoTimbre=bajoTimbre,
         kit=T["kit"], lofi=lofi, graves=T.get("graves") or float(rng.uniform(*REF["graves"])),
-        bajoNivel=T.get("bajoNivel") if E.get("bajoNivel") else float(rng.uniform(*REF["bajoNivel"])), bajoGrave=True,
+        bajoNivel=T.get("bajoNivel") if E.get("bajoNivel") else float(rng.uniform(*REF["bajoNivel"])),
         sala=sala, niveles=T["niveles"], tex=T["tex"], texVol=T.get("texVol", 1), bonsho=bool(T.get("bonsho")),
         familia=familia, progA=progA, progB=progB, idA=idA, idB=idB, acordes=acordes, esc=esc, centro_idx=centro_idx,
         registro=registro, motivos=motivos, contorno=motivos["M"]["contorno"], densidad=densidad,
@@ -643,7 +641,7 @@ class Compositor:
 
     def tramo(self, estilo, bpm, fondo, opc, seed):
         """Siguiente sección a emitir: (info para el panel, cuerpo, cola)."""
-        E = L.con_instrumentos(L.estilo_de(estilo), tuple(opc.get("quitar", ())), tuple(opc.get("anadir", ())), False)
+        E = L.con_instrumentos(L.estilo_de(estilo), tuple(opc.get("quitar", ())), tuple(opc.get("anadir", ())))
         variedad = str(opc.get("variedad", "medio"))
         melodia = int(opc.get("melodia", 1))
         # instrumentos a la vez: los que el usuario tenga activos (2 a 4); con más de 4 activos, 3 o 4 según la pieza
@@ -654,16 +652,16 @@ class Compositor:
         if opc.get("rehacer") and self.ultimo and p is not None:   # la misma sección otra vez con ajustes nuevos (melodía…)
             self.idx, self.segundos = self.ultimo
         nueva = p is None or self.idx >= len(p["secciones"]) or opc.get("salto")
-        if p is not None and not nueva and opc.get("minimo"):
-            if clave != p["clave"] or (bpm and bpm != p["bpm"]):
-                nueva, continuar = True, True          # cambio de estilo/instrumentos/tempo: pieza nueva que continúa
-            else:                                      # solo cambió la melodía o la variedad: sigue la pieza
-                if melodia != p["melodia"]:
-                    V = VARIEDAD.get(variedad, VARIEDAD["medio"])
-                    _plan_melodia(np.random.default_rng(seed), p["secciones"][self.idx:], V, 3 if p["solo"] else melodia)
-                    p["melodia"] = melodia
-        else:
-            continuar = False
+        continuar = False
+        if p is not None and not nueva and opc.get("minimo") and (clave != p["clave"] or (bpm and bpm != p["bpm"])):
+            nueva, continuar = True, True              # cambio de estilo/instrumentos/tempo: pieza nueva que continúa
+        if p is not None and not nueva and melodia != p["melodia"]:
+            # solo cambió la melodía (el alimentador lo pide con «rehacer», sin «minimo»): la pieza sigue y se
+            # replanifican las frases desde esta sección. (Antes esto solo corría dentro de la rama «minimo»,
+            # que el alimentador no manda en ese caso, y el control «Melodía» no hacía nada hasta la pieza siguiente.)
+            V = VARIEDAD.get(variedad, VARIEDAD["medio"])
+            _plan_melodia(np.random.default_rng(seed), p["secciones"][self.idx:], V, 3 if p["solo"] else melodia)
+            p["melodia"] = melodia
         if p is not None and not nueva and estilo != p["estilo"]:   # rotación de estilos: la pieza va al cierre
             restantes = p["secciones"][self.idx:]
             if len(restantes) > 1:
@@ -678,7 +676,7 @@ class Compositor:
         self.segundos += len(cuerpo) / SR
         self.idx += 1
         info = dict(bpm=p["bpm"], inst=p["inst"], instMel=p["instMelB"] if S["tipo"] == "B" else p["instMel"], bat=p["bat"], modo=p["modo"],
-                    tex=p["tex"], solo_melodia=p["solo"], cambios=[],
+                    tex=p["tex"], solo_melodia=p["solo"],
                     pieza=dict(n=p["n"], perfil=p["perfil"], perfil_nombre=p["perfil_nombre"], tono=p["tono"], variedad=p["variedad"],
                                dur=round(p["dur"], 1), antes=round(antes, 1), seccion=S["nombre"], idx=self.idx, total=len(p["secciones"]),
                                forma=p["forma"], capa=p["capa"], inst2=p.get("inst2"), comp=p["comp"], bajo=p["bajo"], familia=p["familia"],
@@ -688,6 +686,7 @@ class Compositor:
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
 # render de una sección (continuo: devuelve cuerpo exacto + cola de resonancia de 4 s)
+# Toca directamente con los sintetizadores de lofigen (tocar_nota, bajo_nota, bombo, golpe).
 # ══════════════════════════════════════════════════════════════════════════════════════════════
 
 def _ganancia(p, seed):
@@ -706,33 +705,9 @@ def _ganancia(p, seed):
     return p["ganancia"]
 
 
-class _Salida:
-    """Quién toca las notas (los sintetizadores de lofigen). En la 3.0 hubo una variante con muestras
-    reales por FluidSynth; el usuario la descartó en la 3.2 («no me ha gustado, que ocupe menos»)."""
-
-    def __init__(self, p):
-        self.p = p
-
-    def nota(self, buf, inst, m, t, dur, vol, cinta=False):
-        L.tocar_nota(buf, inst, m, t, dur, vol, cinta)
-
-    def bajo(self, buf, m, t, dur, vol):
-        L.bajo_nota(buf, m, t, dur, vol)
-
-    def bombo(self, buf, t, vol, kicks):
-        L.bombo(buf, t, vol, kicks)
-
-    def golpe(self, buf, t, vol, tipo, frec, dur):
-        L.golpe(buf, t, vol, tipo, frec, dur)
-
-    def volcar(self, bus, melb, resto, bat, padb):
-        pass
-
-
 def render_seccion(p, S, seed, fondo=0.0):
     ganancia = _ganancia(p, seed)
     rng = np.random.default_rng(seed)
-    sal = _Salida(p)
     L._RNG = np.random.default_rng(seed + 7)
     L._KIT = {**L.KIT_BASE, **p["kit"]}
     L._BAJO = p["bajoTimbre"]
@@ -744,6 +719,8 @@ def render_seccion(p, S, seed, fondo=0.0):
     compas_dur = negra * 4
     nc = S["compases"]
     total = int((nc * compas_dur + 4) * SR)
+    # padb (pad de fondo) va aparte y se suma al final en el mismo orden de siempre: así la mezcla es
+    # idéntica bit a bit a la de antes (sumar las notas del pad en melb cambiaría el redondeo)
     bus, resto, melb, bat, padb = (np.zeros(total) for _ in range(5))
     kicks = []
     cinta = p["tex"] == "cinta"
@@ -766,7 +743,7 @@ def render_seccion(p, S, seed, fondo=0.0):
         raiz_sig, _, _ = acordes[(c + 1) % nA]
         final_pieza = ultimo and c >= nc - 2          # los dos últimos compases del cierre: acorde largo y nada más
         va = vol_ac * (4 / len(notas)) ** .5
-        acorde = lambda i, d, v: [sal.nota(bus, inst, m, cuando(i) + humano(.004), d, v * (1 + humano(.06)), cinta) for m in notas]
+        acorde = lambda i, d, v: [L.tocar_nota(bus, inst, m, cuando(i) + humano(.004), d, v * (1 + humano(.06)), cinta) for m in notas]
         # ── acordes ──
         if solo:
             pass
@@ -776,11 +753,11 @@ def render_seccion(p, S, seed, fondo=0.0):
         elif S["tipo"] == "intro" and inst != "pad":
             acorde(0, negra * 3.8, va * .8)             # la intro: acordes largos y nada más
         else:
-            _acompanar(sal, p["comp"], bus, inst, notas, cuando, corchea, negra, va, cinta, acorde, S["tipo"], c)
+            _acompanar(p["comp"], bus, inst, notas, cuando, corchea, negra, va, cinta, acorde, c)
         # ── pad de fondo (intro, descanso, B…): acorde largo, muy bajo ──
         if S["pad"] and inst != "pad" and not solo and not final_pieza:
             for m in notas[:3]:
-                sal.nota(padb, "pad", m, cuando(0), negra * 4.2, .022, False)
+                L.tocar_nota(padb, "pad", m, cuando(0), negra * 4.2, .022, False)
         # ── capa: nota guía (tercera o séptima) sostenida, conducida ──
         if S["capa"] and capa and not solo and not final_pieza:
             guias = [m for m in notas if (m - raiz) % 12 in (3, 4, 10, 11)] or notas[1:2]
@@ -788,28 +765,28 @@ def render_seccion(p, S, seed, fondo=0.0):
             m += 12 if capa in ("flauta", "campana", "vibra", "cuenco") else 0
             capa_prev = m
             if c % 2 == 0 or rng.random() < .5:
-                sal.nota(resto, capa, m, cuando(0) + corchea * (0 if c % 2 == 0 else 3), negra * 3.2, .03, cinta)
+                L.tocar_nota(resto, capa, m, cuando(0) + corchea * (0 if c % 2 == 0 else 3), negra * 3.2, .03, cinta)
         # ── cuarto instrumento: arpegio suave una octava arriba (en B, en las A repetidas y en el descanso) ──
         if p.get("inst2") and (S["capa"] or S["tipo"] in ("B", "descanso")) and not solo and not final_pieza:
             arp = [m + 12 for m in notas[:4]]
             patron = (0, 2, 3, 5, 6) if S["tipo"] != "descanso" else (0, 4)
             for j, i in enumerate(patron):
-                sal.nota(resto, p["inst2"], arp[(j + c) % len(arp)], cuando(i) + humano(.005), corchea * 1.6, .03 * (1 + humano(.08)), cinta)
-        # ── bajo ──
+                L.tocar_nota(resto, p["inst2"], arp[(j + c) % len(arp)], cuando(i) + humano(.005), corchea * 1.6, .03 * (1 + humano(.08)), cinta)
+        # ── bajo (siempre grave, máster de referencia 2.9: raíz > 40 → otra octava abajo, zona sub 41-55 Hz) ──
         if S["bajo"] and c >= S["bajo_desde"] and not solo and not final_pieza:
             r = raiz - 12
-            if p["bajoGrave"] and r > 40:   # zona sub: 41-55 Hz
+            if r > 40:
                 r -= 12
-            r_sig = raiz_sig - 12 - (12 if p["bajoGrave"] and raiz_sig - 12 > 40 else 0)
+            r_sig = raiz_sig - 12 - (12 if raiz_sig - 12 > 40 else 0)
             cambia = (c + 1) % nA != c % nA and raiz_sig != raiz
-            _bajo(sal, p["bajo"], resto, r, r_sig, pcs, cuando, negra, corchea, rng, cambia, S["tipo"], c, p["tonica"])
+            _bajo(p["bajo"], resto, r, r_sig, pcs, cuando, negra, corchea, rng, cambia, p["tonica"])
         # ── batería ──
         if S["bat"] and c >= S["bat_desde"] and not solo and not final_pieza:
             fill = S["fill"] if c == nc - 1 else None
             entrada = c == S["bat_desde"] and S["tipo"] == "A"
-            _bateria(sal, R, G, bat, cuando, corchea, rng, kicks, S["bat"] * niv["bateria"], S["hats"], fill, c, tarde, humano, entrada)
+            _bateria(R, G, bat, cuando, corchea, rng, kicks, S["bat"] * niv["bateria"], S["hats"], fill, c, tarde, humano, entrada)
         if p["bonsho"] and c % 8 == 0 and not solo:
-            sal.nota(resto, "bonsho", p["tonica"] - 12, t, 5, .13)
+            L.tocar_nota(resto, "bonsho", p["tonica"] - 12, t, 5, .13)
         # ── melodía: frase de dos compases ──
         if c % 2 == 0 and c // 2 < len(S["frases"]) and S["frases"][c // 2] and not final_pieza:
             nombre, tipo, vars_ = S["frases"][c // 2]
@@ -817,17 +794,13 @@ def render_seccion(p, S, seed, fondo=0.0):
             for v in vars_:
                 m = _variar(rng, m, v)
             ac2 = [(acordes[c % nA][0], acordes[c % nA][2]), (acordes[(c + 1) % nA][0], acordes[(c + 1) % nA][2])]
-            notas_mel = _realizar(m, p["esc"], p["centro_idx"], ac2, p["tonica"], tipo, p["tonica"] + 29)
+            notas_mel = _realizar(m, p["esc"], p["centro_idx"], ac2, tipo, p["tonica"] + 29)
             vol_mel = (.09 if solo else .062) * niv["melodia"]
             for o, d, midi in notas_mel:
                 if o >= 16:
                     continue
-                sal.nota(melb, inst_mel, midi, cuando(o) + humano(.006), corchea * d * .95, vol_mel * (1 + humano(.08)), cinta)
+                L.tocar_nota(melb, inst_mel, midi, cuando(o) + humano(.006), corchea * d * .95, vol_mel * (1 + humano(.08)), cinta)
     # ── mezcla ──
-    sal.volcar(bus, melb, resto, bat, padb)
-    if p.get("_debug") is not None:   # niveles por capa (calibración)
-        p["_debug"][S["nombre"]] = {k: round(20 * float(np.log10(np.sqrt(np.mean(v ** 2)) + 1e-9)), 1)
-                                    for k, v in (("acordes", bus), ("melodia", melb), ("resto", resto), ("bateria", bat), ("pad", padb))}
     pump = np.ones(total)
     rec = int(.28 * SR)
     curva = .45 + .55 * np.linspace(0, 1, rec)
@@ -854,16 +827,16 @@ def render_seccion(p, S, seed, fondo=0.0):
     return mix[:corte], cola
 
 
-def _acompanar(sal, comp, bus, inst, notas, cuando, corchea, negra, va, cinta, acorde, tipo, c):
+def _acompanar(comp, bus, inst, notas, cuando, corchea, negra, va, cinta, acorde, c):
     ac = notas
     if comp == "ostinato":
         for i in range(8):
-            sal.nota(bus, inst, ac[i % 2] + (12 if i % 2 else 0), cuando(i), corchea * 1.2, va * .6, cinta)
+            L.tocar_nota(bus, inst, ac[i % 2] + (12 if i % 2 else 0), cuando(i), corchea * 1.2, va * .6, cinta)
     elif comp == "bossa":
         for i, d in ((0, 2.2), (3, 1.4), (4, 2.2), (7, 1.4)):
             acorde(i, corchea * d, va * .8)
     elif comp == "balanceo":
-        sal.nota(bus, inst, ac[0], cuando(0), negra * 2, va, cinta)
+        L.tocar_nota(bus, inst, ac[0], cuando(0), negra * 2, va, cinta)
         acorde(2, corchea * 2.4, va * .7)
         acorde(6, corchea * 2.4, va * .7)
     elif comp == "pad" or inst == "pad":
@@ -877,55 +850,57 @@ def _acompanar(sal, comp, bus, inst, notas, cuando, corchea, negra, va, cinta, a
     elif comp == "arpegio":
         notas2 = ac + [ac[1] + 12]
         for i, k in enumerate((0, 1, 2, 3, 4, 3, 2, 1)):
-            sal.nota(bus, inst, notas2[k % len(notas2)], cuando(i), corchea * 1.8, va * .8, cinta)
+            L.tocar_nota(bus, inst, notas2[k % len(notas2)], cuando(i), corchea * 1.8, va * .8, cinta)
     elif comp == "roto":
-        sal.nota(bus, inst, ac[0], cuando(0), negra * 3.5, va, cinta)
+        L.tocar_nota(bus, inst, ac[0], cuando(0), negra * 3.5, va, cinta)
         for i, m in zip((2, 3, 4, 6), ac[1:] + ac[1:]):
-            sal.nota(bus, inst, m, cuando(i), corchea * 2.5, va * .75, cinta)
+            L.tocar_nota(bus, inst, m, cuando(i), corchea * 2.5, va * .75, cinta)
     else:   # largo
         acorde(0, negra * 3.7, va)
         if inst != "pad" and c % 2:
             acorde(5, negra * 1.4, va * .6)
 
 
-def _bajo(sal, est, resto, r, r_sig, pcs, cuando, negra, corchea, rng, cambia, tipo, c, tonica):
+def _bajo(est, resto, r, r_sig, pcs, cuando, negra, corchea, rng, cambia, tonica):
     """Bajo según su patrón, y una nota de paso hacia la raíz siguiente cuando cambia el acorde."""
+    bajo = L.bajo_nota
     tercera = r + (3 if (r + 3) % 12 in pcs else 4)
     quinta = r + 7
     if est == "largo":
-        sal.bajo(resto, r, cuando(0), negra * 3.5, .075)
+        bajo(resto, r, cuando(0), negra * 3.5, .075)
     elif est == "rebote":
-        sal.bajo(resto, r, cuando(0), negra * .9, .075)
-        sal.bajo(resto, r + 12, cuando(3), negra * .6, .05)
-        sal.bajo(resto, quinta if rng.random() < .5 else r, cuando(4), negra * 1.4, .065)
+        bajo(resto, r, cuando(0), negra * .9, .075)
+        bajo(resto, r + 12, cuando(3), negra * .6, .05)
+        bajo(resto, quinta if rng.random() < .5 else r, cuando(4), negra * 1.4, .065)
     elif est == "octavas":
         for i in (0, 2, 4, 6):
-            sal.bajo(resto, r + (12 if i in (2, 6) else 0), cuando(i), negra * .8, .06)
+            bajo(resto, r + (12 if i in (2, 6) else 0), cuando(i), negra * .8, .06)
     elif est == "sincopado":
-        sal.bajo(resto, r, cuando(0), negra * 1.2, .075)
-        sal.bajo(resto, r, cuando(3), negra * .7, .055)
-        sal.bajo(resto, quinta if rng.random() < .4 else r, cuando(5), negra * 1.2, .065)
+        bajo(resto, r, cuando(0), negra * 1.2, .075)
+        bajo(resto, r, cuando(3), negra * .7, .055)
+        bajo(resto, quinta if rng.random() < .4 else r, cuando(5), negra * 1.2, .065)
     elif est == "pedal":
         ped = tonica - 12
         while ped > r + 5:
             ped -= 12
-        sal.bajo(resto, ped, cuando(0), negra * 3.8, .07)
+        bajo(resto, ped, cuando(0), negra * 3.8, .07)
     else:   # caminante: raíz, tercera o quinta, y aproximación cromática o diatónica
-        sal.bajo(resto, r, cuando(0), negra * .9, .065)
-        sal.bajo(resto, tercera if rng.random() < .6 else quinta, cuando(2), negra * .9, .06)
-        sal.bajo(resto, quinta if rng.random() < .6 else r + 12, cuando(4), negra * .9, .06)
+        bajo(resto, r, cuando(0), negra * .9, .065)
+        bajo(resto, tercera if rng.random() < .6 else quinta, cuando(2), negra * .9, .06)
+        bajo(resto, quinta if rng.random() < .6 else r + 12, cuando(4), negra * .9, .06)
         if cambia:
             apro = r_sig + int(rng.choice([-1, 1, -2, 2]))
-            sal.bajo(resto, apro, cuando(6), negra * .9, .06)
+            bajo(resto, apro, cuando(6), negra * .9, .06)
         else:
-            sal.bajo(resto, tercera, cuando(6), negra * .9, .055)
+            bajo(resto, tercera, cuando(6), negra * .9, .055)
         return
     if cambia and est != "pedal" and rng.random() < .55:   # nota de paso en la última corchea
         apro = r_sig + int(rng.choice([-1, 1, 2, -2, 7, -5]))
-        sal.bajo(resto, apro, cuando(7), corchea * .9, .05)
+        bajo(resto, apro, cuando(7), corchea * .9, .05)
 
 
-def _bateria(sal, R, G, bat, cuando, corchea, rng, kicks, nivel, hats, fill, c, tarde, humano, entrada):
+def _bateria(R, G, bat, cuando, corchea, rng, kicks, nivel, hats, fill, c, tarde, humano, entrada):
+    bombo, golpe = L.bombo, L.golpe
     K = R["K"]
     if G["varK"] and c % 2 == 1 and rng.random() < .55:   # compases pares: variante de bombo
         K = str(rng.choice(G["varK"]))
@@ -935,34 +910,32 @@ def _bateria(sal, R, G, bat, cuando, corchea, rng, kicks, nivel, hats, fill, c, 
         S_ = R["S"]
     hv = hats * G["hats"] * L._KIT["hv"]
     for i in range(8):
-        if fill == "corte" and i >= 4:
-            break
-        if fill in ("redoble", "pickup") and i >= 4:
+        if fill in ("corte", "redoble", "pickup") and i >= 4:   # el relleno ocupa la segunda mitad
             break
         if K[i] == "x":
-            sal.bombo(bat, cuando(i) + humano(.003), (.34 if i == 0 else .26) * nivel * (1 + humano(.08)), kicks)
+            bombo(bat, cuando(i) + humano(.003), (.34 if i == 0 else .26) * nivel * (1 + humano(.08)), kicks)
         if S_[i] == "x":
-            sal.golpe(bat, cuando(i) + tarde + humano(.003), .13 * nivel * (1 + humano(.1)), "bandpass", 1500 * L._KIT["sn"], L._KIT["sd"])
+            golpe(bat, cuando(i) + tarde + humano(.003), .13 * nivel * (1 + humano(.1)), "bandpass", 1500 * L._KIT["sn"], L._KIT["sd"])
         elif S_[i] == "r":
-            sal.golpe(bat, cuando(i) + humano(.003), .08 * nivel, "bandpass", 2600 * L._KIT["sn"], .05)
+            golpe(bat, cuando(i) + humano(.003), .08 * nivel, "bandpass", 2600 * L._KIT["sn"], .05)
         if hv > 0:
             if R["H"][i] == "x" and not (rng.random() < .1):
-                sal.golpe(bat, cuando(i) + humano(.006), (.018 if i % 2 else .028) * hv * (1 + humano(.15)), "highpass", 7500 * L._KIT["hh"], .045)
+                golpe(bat, cuando(i) + humano(.006), (.018 if i % 2 else .028) * hv * (1 + humano(.15)), "highpass", 7500 * L._KIT["hh"], .045)
             elif R["H"][i] == "o":
-                sal.golpe(bat, cuando(i) + humano(.005), .025 * hv, "highpass", 6500 * L._KIT["hh"], .22)
+                golpe(bat, cuando(i) + humano(.005), .025 * hv, "highpass", 6500 * L._KIT["hh"], .22)
         if i % 2 and S_[i] == "." and rng.random() < .12 * nivel:   # alguna nota fantasma
-            sal.golpe(bat, cuando(i) + humano(.004), .03 * nivel, "bandpass", 1500 * L._KIT["sn"], L._KIT["sd"] * .7)
+            golpe(bat, cuando(i) + humano(.004), .03 * nivel, "bandpass", 1500 * L._KIT["sn"], L._KIT["sd"] * .7)
         if R.get("W", "........")[i] == "x":
-            sal.golpe(bat, cuando(i), .09, "bandpass", 1000, .035)
+            golpe(bat, cuando(i), .09, "bandpass", 1000, .035)
     if fill == "redoble":       # semicorcheas de caja creciendo en los dos últimos tiempos
         for k in range(8):
-            sal.golpe(bat, cuando(4) + k * corchea / 2 + humano(.003), (.03 + .07 * k / 7) * nivel, "bandpass", 1500 * L._KIT["sn"], .08)
+            golpe(bat, cuando(4) + k * corchea / 2 + humano(.003), (.03 + .07 * k / 7) * nivel, "bandpass", 1500 * L._KIT["sn"], .08)
     elif fill == "pickup":      # bombo, bombo, caja
-        sal.bombo(bat, cuando(5), .26 * nivel, kicks)
-        sal.bombo(bat, cuando(6), .26 * nivel, kicks)
-        sal.golpe(bat, cuando(7) + tarde, .13 * nivel, "bandpass", 1500 * L._KIT["sn"], L._KIT["sd"])
+        bombo(bat, cuando(5), .26 * nivel, kicks)
+        bombo(bat, cuando(6), .26 * nivel, kicks)
+        golpe(bat, cuando(7) + tarde, .13 * nivel, "bandpass", 1500 * L._KIT["sn"], L._KIT["sd"])
     elif fill == "charles":     # charles abierto en la última corchea
-        sal.golpe(bat, cuando(7), .035 * max(hats, .5), "highpass", 6500 * L._KIT["hh"], .3)
+        golpe(bat, cuando(7), .035 * max(hats, .5), "highpass", 6500 * L._KIT["hh"], .3)
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
@@ -1001,8 +974,8 @@ def generate_pieza(seed, outdir, estilo="aleatorio", variedad="medio", perfil=No
     return out, p
 
 
-def piezas_de_prueba(variedad="medio", estilo="aleatorio"):
-    """Tres piezas contrastadas: perfiles distintos, tonalidades y tempos separados."""
+def piezas_de_prueba(estilo="aleatorio"):
+    """Tres piezas contrastadas: (semilla, perfil) con perfiles distintos entre los que admite el estilo."""
     rng = np.random.default_rng(int(time.time()))
     nombres = [p for p in PERFILES_ESTILO.get(estilo, list(PERFILES)) if p in PERFILES]
     if len(nombres) < 3:
@@ -1019,7 +992,7 @@ def _cli():
     outdir = args[1] if len(args) > 1 else "."
     variedad = args[args.index("--variedad") + 1] if "--variedad" in args else "medio"
     prev = None
-    for k, (seed, perfil) in enumerate(piezas_de_prueba(variedad)):
+    for k, (seed, perfil) in enumerate(piezas_de_prueba()):
         t0 = time.time()
         out, p = generate_pieza(seed, outdir, "aleatorio", variedad, perfil, 0.0, prev)
         prev = p

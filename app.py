@@ -25,7 +25,7 @@ import escenas
 import lofigen
 import piezas
 
-VERSION = "3.3"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
+VERSION = "3.4"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
 BASE = Path(__file__).parent
 TRACKS_DIR = BASE / "data" / "tracks"
 VIDEOS_DIR = BASE / "data" / "videos"    # biblioteca de videos + cola
@@ -139,6 +139,25 @@ def set_titulo(archivo, titulo, f=TITULOS_FILE):
 # para no relanzarlo cada 3 s con un archivo roto).
 
 _meta = {}
+_meta_llamadas = 0
+
+
+def _podar_meta(n_archivos):
+    """Quita de _meta las entradas de archivos borrados o reemplazados (la clave lleva el mtime, así
+    que sin poda crecería para siempre). Desde /api/state: cada 100 llamadas o si la caché pasa de
+    4 veces el número de archivos."""
+    global _meta_llamadas
+    _meta_llamadas += 1
+    if _meta_llamadas % 100 and len(_meta) <= 4 * max(n_archivos, 1):
+        return
+    for nombre, m in list(_meta):
+        p = (TRACKS_DIR if nombre.endswith(".mp3") else VIDEOS_DIR) / nombre
+        try:
+            vivo = p.stat().st_mtime_ns == m
+        except OSError:
+            vivo = False
+        if not vivo:
+            _meta.pop((nombre, m), None)
 
 
 def _cacheado(p, calcular):
@@ -170,7 +189,7 @@ def _probe_track(p):
 
 def track_meta(p):
     """Duración, título y tema desde los metadatos del MP3."""
-    return _cacheado(p, _probe_track) or {"dur": 0.0, "title": p.name[:-4], "tema": ""}
+    return _cacheado(p, _probe_track) or {"dur": 0.0, "title": p.name[:-4], "tema": "", "url": ""}
 
 
 def video_meta(p):
@@ -208,7 +227,7 @@ def gen_job(count, estilo="aleatorio", fondo=1.0, prueba=None):
     """Compone `count` canciones. prueba=(variedad): modo de prueba del compositor de piezas, tres
     piezas enteras y contrastadas (perfiles distintos) para comparar."""
     rng = random.Random()
-    lote = piezas.piezas_de_prueba(prueba, estilo) if prueba else None
+    lote = piezas.piezas_de_prueba(estilo) if prueba else None
     anterior = None
     try:
         for i in range(count):
@@ -284,9 +303,10 @@ def titulo_de(archivo, titulos):
     return titulos.get(archivo) or archivo[:-4].replace("-", " ").capitalize()
 
 
-def _convertir(cmd, destino, titulo="", terminar=True):
+def _convertir(cmd, destino, titulo=""):
     """Ejecuta ffmpeg hacia un .part y lo publica solo si termina bien
-    (así un corte nunca deja un video roto en la biblioteca)."""
+    (así un corte nunca deja un video roto en la biblioteca). El llamador pone
+    video_state["running"] = False cuando acaba su trabajo."""
     parcial = destino.with_suffix(".part")
     try:
         subprocess.run(cmd + ["-f", "mp4", str(parcial)], check=True, capture_output=True, text=True)
@@ -300,8 +320,6 @@ def _convertir(cmd, destino, titulo="", terminar=True):
         video_state["error"] = str(e)
     finally:
         parcial.unlink(missing_ok=True)
-        if terminar:
-            video_state["running"] = False
 
 
 def video_job(tipo, cantidad):
@@ -336,7 +354,7 @@ def video_job(tipo, cantidad):
             while titulo in usados:   # «Lluvia», «Lluvia 2», «Lluvia 3»…
                 titulo, n = f"{nombre} {n}", n + 1
             _convertir(cmd + ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20"],
-                       libre(VIDEOS_DIR, f"escena-{nombre}", ".mp4", "video"), titulo, terminar=False)
+                       libre(VIDEOS_DIR, f"escena-{nombre}", ".mp4", "video"), titulo)
             if video_state["error"]:
                 break
         video_state["done"] = cantidad
@@ -358,7 +376,7 @@ def transcode_job(src, nombre, video=None):
     try:
         if copiable:
             _convertir(["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-map", "0:v:0",
-                        "-c:v", "copy", "-an", "-movflags", "+faststart"], destino, titulo, terminar=False)
+                        "-c:v", "copy", "-an", "-movflags", "+faststart"], destino, titulo)
             if destino.exists():
                 return
             video_state["error"] = ""   # la copia no fue posible (contenedor raro): se recodifica
@@ -385,6 +403,7 @@ def imagen_job(src, nombre):
                     "-an", "-movflags", "+faststart"],
                    libre(VIDEOS_DIR, nombre, ".mp4", "imagen"), nombre.replace("_", " ").strip()[:80])
     finally:
+        video_state["running"] = False
         src.unlink(missing_ok=True)
 
 
@@ -554,10 +573,9 @@ def api_video():
     if tipo not in escenas.TIPOS:
         return jsonify(error="tipo de escena no válido"), 400
     cantidad = max(1, min(int(data.get("count", 1) or 1), 5))
-    with _lock:
-        if video_state["running"]:
-            return jsonify(error="ya se está procesando un video"), 409
-        video_state.update(running=True, error="", done=0, total=cantidad, tipo=escenas.TIPOS[tipo], destino="video")
+    if not _ocupar():
+        return jsonify(error="ya se está procesando un video"), 409
+    video_state.update(total=cantidad, tipo=escenas.TIPOS[tipo], destino="video")
     threading.Thread(target=video_job, args=(tipo, cantidad), daemon=True).start()
     return jsonify(ok=True)
 
@@ -653,6 +671,7 @@ INFINITA_DEF = {"activo": False, "estilos": ["aleatorio"], "rotar_min": 60, "bpm
                 "inst_quitar": [], "inst_anadir": [], "melodia": 1, "variedad": "medio",
                 "inst_aleatorio": False, "melodia_aleatoria": False}   # bpm 0 = automático; melodia 0-3 (1 = de vez en cuando)
 ROTAR_MIN = (0, 15, 30, 60, 120, 240)   # 0 = mezclar los estilos marcados en vez de rotar
+_INF_SOLO_PANEL = ("inst_estilo", "instrumentos")   # claves de estado_infinita solo para pintar: ni config ni infinita.json
 
 
 def estado_infinita(cfg=None):
@@ -677,7 +696,7 @@ def estado_infinita(cfg=None):
 
 def aplicar_infinita(d):
     with _io_lock:
-        escribir_json(INFINITA_FILE, {k: v for k, v in d.items() if k not in ("inst_estilo", "instrumentos")})
+        escribir_json(INFINITA_FILE, {k: v for k, v in d.items() if k not in _INF_SOLO_PANEL})
 
 
 aplicar_infinita(estado_infinita())   # al arrancar, según la configuración guardada
@@ -727,7 +746,7 @@ def api_infinita():
         if bpm and not 50 <= bpm <= 110:
             return jsonify(error="el tempo va de 50 a 110 bpm (0 = automático)"), 400
         d["bpm"] = bpm
-    actualizar_config(infinita={k: v for k, v in d.items() if k not in ("inst_estilo", "instrumentos")})
+    actualizar_config(infinita={k: v for k, v in d.items() if k not in _INF_SOLO_PANEL})
     aplicar_infinita(d)
     return jsonify(ok=True, infinita=estado_infinita())
 
@@ -1322,6 +1341,7 @@ def api_state():
         videos.append((st.st_mtime, {"name": p.name, "title": titulo_de(p.name, titulos),
                                      "dur": video_meta(p), "size": st.st_size}))
     videos = [v for _, v in sorted(videos, key=lambda x: x[0], reverse=True)]
+    _podar_meta(len(tracks) + len(videos))
     corriendo = stream_running()
     actual = leer_json(VIDEOS_DIR / "actual.json", {}) if corriendo else {}
     musica = leer_json(TRACKS_DIR / "actual.json", {}) if corriendo else {}

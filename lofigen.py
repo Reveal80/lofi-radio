@@ -125,14 +125,18 @@ def _cuerda(f, n):
     N = max(2, int(round(SR / f - .5)))
     if N < 64:
         # notas agudas: pocas muestras por ciclo, así que redondear el periodo
-        # desafina; se calcula a 4x de frecuencia de muestreo (filtro recursivo,
-        # rápido con periodos cortos) y se reduce después
+        # desafina; se calcula a 4x de frecuencia de muestreo y se reduce después.
+        # Misma recurrencia por bloques que abajo (antes era un lfilter con un
+        # denominador de cientos de ceros: 7 veces más lento con la misma salida)
         N4 = int(round(4 * SR / f - .5))
-        a = np.zeros(N4 + 2)
-        a[[0, N4, N4 + 1]] = 1, -.4995, -.4995   # .4995 a 4x ≈ la misma caída que .498 a 1x
-        x = np.zeros(4 * n + 1)
-        x[1:N4 + 1] = _RNG.uniform(-1, 1, N4)
-        return signal.resample_poly(signal.lfilter([1], a, x)[1:4 * n + 1], 1, 4)[:n]
+        total = 4 * n + 1
+        y = np.zeros(total + N4 + 1)
+        y[1:N4 + 1] = _RNG.uniform(-1, 1, N4)
+        for s in range(N4 + 1, total, N4):
+            e = min(s + N4, total)
+            L = e - s
+            y[s:e] = .4995 * y[s - N4:s - N4 + L] + .4995 * y[s - N4 - 1:s - N4 - 1 + L]   # .4995 a 4x ≈ .498 a 1x
+        return signal.resample_poly(y[1:total], 1, 4)[:n]
     y = np.zeros(n + N + 1)
     y[1:N + 1] = _RNG.uniform(-1, 1, N)
     for s in range(N + 1, n + N + 1, N):
@@ -322,11 +326,10 @@ def guino(buf, T, t, corchea):
 
 # ── el compás y la estructura de 16 (port directo de compas()) ──
 
-def render_theme(T, cycles, seed, continuo=False, fondo=1.0):
-    """Renderiza el tema. Con continuo=True (radio infinita) no hay entrada filtrada ni fundidos
-    y devuelve (cuerpo, cola): los compases exactos y los 4 s de resonancia que se superponen
-    al tramo siguiente, para enlazar tramos sin cortes. fondo: nivel de la textura (vinilo, lluvia,
-    cinta); 0 la quita (en la radio infinita el usuario la oía como ruido blanco)."""
+def render_theme(T, cycles, seed, fondo=1.0):
+    """Renderiza el tema («Componer»: `cycles` vueltas de 16 compases, con entrada y fundidos).
+    fondo: nivel de la textura (vinilo, lluvia, cinta); 0 la quita. La radio infinita ya no pasa
+    por aquí: compone piezas con piezas.py (que usa estos mismos sintetizadores)."""
     global _RNG, _KIT, _BAJO, _BAJO_NIVEL
     _RNG = np.random.default_rng(seed)
     _KIT = {**KIT_BASE, **T.get("kit", {})}
@@ -353,7 +356,6 @@ def render_theme(T, cycles, seed, continuo=False, fondo=1.0):
     partes = ESTRUCTURAS.get(T.get("estructura", "clasica"), ESTRUCTURAS["clasica"])
     ritmo_arm = T.get("ritmo_armonico", "compas")
     voicing = T.get("voicing", "cerrada")
-    solo = bool(T.get("solo_melodia"))   # radio infinita sin instrumentos: solo la melodía
     ghost = float(T.get("ghost", 0))
     for paso in range(cycles * 16):
         t = paso * compas_dur
@@ -368,9 +370,7 @@ def render_theme(T, cycles, seed, continuo=False, fondo=1.0):
         comp = T.get("comp", "largo")
         va = vol_ac * (4 / len(ac)) ** .5   # las novenas (5 notas) no suenan más fuerte
         acorde = lambda i, d, v: [tocar_nota(bus, inst, m, cuando(i), d, v, cinta) for m in acorde_en(i)]
-        if solo:
-            pass   # sin acompañamiento
-        elif comp == "ostinato":   # dos notas del acorde alternando a corcheas
+        if comp == "ostinato":     # dos notas del acorde alternando a corcheas
             for i in range(8):
                 tocar_nota(bus, inst, ac[i % 2] + (12 if i % 2 else 0), cuando(i), corchea * 1.2, va * .6, cinta)
         elif comp == "bossa":      # patrón de bossa: 1, el «y» de 2, 3 y el «y» de 4
@@ -401,7 +401,7 @@ def render_theme(T, cycles, seed, continuo=False, fondo=1.0):
             if inst != "pad" and parte != "entrada" and c % 2:
                 acorde(5, negra * 1.4, va * .6)
         # el bajo, según su estilo (dos octavas abajo)
-        if parte != "entrada" and not solo:
+        if parte != "entrada":
             grave = T.get("bajoGrave")   # anime: otra octava más abajo si cabe (zona sub, 50-90 Hz)
             raiz = lambda i: (lambda r: r - 12 if grave and r > 43 else r)(_acorde_en(lista, ritmo_arm, c, i)[0] - 12)
             r = raiz(0)
@@ -429,7 +429,7 @@ def render_theme(T, cycles, seed, continuo=False, fondo=1.0):
                 for j, k in enumerate((0, 2, 4, 6)):
                     bajo_nota(resto, raiz(k) + (0, 3, 5, 7)[j], cuando(k), negra * .9, .065)
         # la batería: ni en la entrada ni en el respiro (y a veces la B va sin bombo)
-        if parte in ("A", "B") and not solo:
+        if parte in ("A", "B"):
             sin_bombo = parte == "B" and T.get("break")
             for i in range(8):
                 if R["K"][i] == "x" and not sin_bombo:
@@ -454,17 +454,14 @@ def render_theme(T, cycles, seed, continuo=False, fondo=1.0):
         if T.get("bonsho") and c % 8 == 0:   # campana de templo al empezar cada 8 compases
             tocar_nota(resto, "bonsho", T.get("raiz", 50) - 12, t, 5, .13)
         # el gancho: en A tal cual, en B una octava arriba y no siempre entero
-        toca = T.get("mel_compases")   # None = en todos los compases de A/B (canciones de la biblioteca)
-        if solo:
-            toca = None
-        if (parte in ("A", "B") or solo) and T.get("mel") and (toca is None or c in toca):
+        if parte in ("A", "B") and T.get("mel"):
             k0 = (c - 2) % len(T["mel"])
             frase = T["mel"][k0]
             durs = T.get("mel_dur", [None] * len(T["mel"]))[k0] or [1.7] * 8
-            sube = 12 if parte == "B" and T.get("subeB", True) else 0
-            vol_mel = (.09 if solo else .065) * niv["melodia"]
+            sube = 12 if parte == "B" else 0
+            vol_mel = .065 * niv["melodia"]
             for k, m in enumerate(frase):
-                if not m or (parte == "B" and not solo and _RNG.random() < .2):
+                if not m or (parte == "B" and _RNG.random() < .2):
                     continue
                 tocar_nota(melb, inst_mel, m + sube, cuando(k), corchea * durs[k] * .95, vol_mel, cinta)
         if T.get("guino") and c == 15:
@@ -481,37 +478,30 @@ def render_theme(T, cycles, seed, continuo=False, fondo=1.0):
 
     sala = T.get("sala", (0, 1))
     mix = reverb(bus * pump + melb, *sala) + resto + bat * niv["bateria"]
-    if solo:
-        fondo = 0   # solo melodía: sin textura
     if T.get("lofi"):   # carácter de la canción: más o menos «apagada»
         mix = lowpass(mix, T["lofi"])
     if T.get("graves"):   # realce de graves (estilo anime: bombo y bajo muy profundos)
         mix += lowpass(mix, 80) * T["graves"]
-    if T.get("intro_filtro") and not continuo:   # la entrada suena como a través de una pared y se abre
+    if T.get("intro_filtro"):   # la entrada suena como a través de una pared y se abre
         fin = int(2 * compas_dur * SR)
         apagado = lowpass(mix[:fin], 450)
         w = np.linspace(0, 1, fin) ** 2
         mix[:fin] = apagado * (1 - w) + mix[:fin] * w
     if fondo:
         mix += textura(total, T.get("tex", "vinilo")) * .5 * T.get("texVol", 1) * fondo
-    if not continuo:
-        f_in, f_out = int(2.5 * SR), int(3 * SR)
-        mix[:f_in] *= np.linspace(0, 1, f_in)
-        mix[-f_out:] *= np.linspace(1, 0, f_out)
+    f_in, f_out = int(2.5 * SR), int(3 * SR)
+    mix[:f_in] *= np.linspace(0, 1, f_in)
+    mix[-f_out:] *= np.linspace(1, 0, f_out)
     # máster: nivela a ~-16 dBFS RMS y redondea los picos con un limitador suave
     mix = mix / (np.sqrt(np.mean(mix ** 2)) + 1e-9) * 10 ** (-16 / 20)
     mix = np.tanh(mix * 1.4) / 1.4
-    if continuo:   # sin normalizar al pico: así todos los tramos salen al mismo nivel
-        corte = int(cycles * 16 * compas_dur * SR)
-        cola = mix[corte:] * np.linspace(1, 0, total - corte)
-        return mix[:corte], cola
     return mix / np.max(np.abs(mix)) * .92
 
 # ── compositor de temas nuevos ──
 
 _QUAL = {"maj7": (0, 4, 7, 11), "m7": (0, 3, 7, 10), "7": (0, 4, 7, 10),
          "6": (0, 4, 7, 9), "maj9": (0, 4, 7, 11, 14), "m9": (0, 3, 7, 10, 14), "9": (0, 4, 7, 10, 14),
-         "5": (0, 7, 12), "sus2": (0, 2, 7), "sus4": (0, 5, 7),   # abiertos, para el templo
+         "5": (0, 7, 12), "sus2": (0, 2, 7),   # abiertos, para el templo
          "m7b5": (0, 3, 6, 10), "m6": (0, 3, 7, 9), "add9": (0, 4, 7, 14), "madd9": (0, 3, 7, 14)}
 ESCALAS = {   # pentatónicas japonesas (semitonos desde la tónica)
     "hirajoshi": (0, 2, 3, 7, 8), "insen": (0, 1, 5, 7, 10), "yo": (0, 2, 5, 7, 9),
@@ -589,13 +579,6 @@ def _acordes_de(prog, tonica):
             root += 12
         out.append([root + s for s in _QUAL[q]])
     return out
-
-
-_PATRONES_MEL = {
-    "escasa": [(0,), (0, 4), (2,), (0, 6), (4,), (0, 3)],
-    "normal": [(0, 2, 4), (0, 2, 4, 6), (0, 3, 4, 6), (2, 4, 6), (0, 2, 5), (0, 4, 6)],
-    "densa":  [(0, 1, 2, 4, 6), (0, 2, 3, 4, 6), (0, 1, 3, 4, 5, 6), (0, 2, 4, 5, 6), (0, 1, 2, 3, 4)],
-}
 
 
 _FORMAS_MEL = [   # forma de las 4 frases: A = motivo, A' = variación, B/C = otros motivos, - = silencio/nota larga
@@ -702,8 +685,10 @@ TODOS = dict(
     inst=["rhodes", "rhodes", "piano", "piano", "vibra", "pad", "pulso", "guitarra", "guitarra"],
     instMel=["vibra", "piano", "caja", "rhodes", "pulso", "chip", "flauta", "campana", "guitarra", "saxo", "trompeta", "clarinete", "shakuhachi", "koto"],
     bat=["boombap", "medio", "shuffle", "roto", "suave", "dilla", "perezoso", "doble"],
-    bajo=["largo", "rebote", "caminante"], tex=["vinilo", "vinilo", "lluvia", "cinta"],
-    comp=["largo", "pad", "stabs", "charleston", "arpegio", "roto"],
+    # (3.4: octavas/sincopado/pedal y ostinato/bossa/balanceo faltaban aquí y nunca sonaban, ni en Componer
+    # ni en los perfiles de piezas.py que los preferían)
+    bajo=["largo", "rebote", "caminante", "octavas", "sincopado", "pedal"], tex=["vinilo", "vinilo", "lluvia", "cinta"],
+    comp=["largo", "pad", "stabs", "charleston", "arpegio", "roto", "ostinato", "bossa", "balanceo"],
     densidad=["escasa", "normal", "normal", "densa"],
     bajoTimbre=["triangulo", "sub", "cuerda", "sinte"],
 )
@@ -726,43 +711,43 @@ ESTILOS = {
     "lluvioso": dict(nombre="Día de lluvia", desc="Melancólico y en menor, con lluvia de fondo y ritmo suave.",
                      bpm=(60, 72), sw=(.08, .14), menor=.9, inst=["piano", "rhodes", "guitarra"],
                      instMel=["piano", "clarinete", "vibra", "flauta", "saxo"], bat=["suave", "medio", "perezoso"], bajo=["largo"],
-                     tex=["lluvia"], comp=["arpegio", "roto", "largo"], densidad=["escasa", "normal"], guino=0),
+                     tex=["lluvia"], comp=["arpegio", "roto", "largo", "balanceo"], densidad=["escasa", "normal"], guino=0),
     "retro": dict(nombre="Retro 8 bits", desc="Lofi con sintes de videojuego, arpegios rápidos y guiños chiptune.",
                   bpm=(82, 96), sw=(.12, .2), menor=.4, inst=["pulso", "pulso", "rhodes"], instMel=["chip", "chip", "pulso"],
                   bat=["shuffle", "roto", "doble", "boombap"], bajo=["rebote", "caminante"], tex=["vinilo", "cinta"],
-                  comp=["arpegio", "stabs"], densidad=["normal", "densa"], guino=1, sala=(.03, .15)),
+                  comp=["arpegio", "stabs", "ostinato"], densidad=["normal", "densa"], guino=1, sala=(.03, .15)),
     "ambiente": dict(nombre="Ambiente", desc="Sin batería: pads, campanas y flauta para fondo.",
                      bpm=(56, 66), sw=(.04, .08), menor=.5, inst=["pad", "pad", "vibra"], instMel=["campana", "flauta", "vibra"],
-                     bat=["nada"], bajo=["largo"], tex=["cinta", "lluvia", "vinilo"], comp=["pad", "arpegio"],
+                     bat=["nada"], bajo=["largo", "pedal"], tex=["cinta", "lluvia", "vinilo"], comp=["pad", "arpegio"],
                      densidad=["escasa"], guino=0, intro=1, sala=(.3, .55)),
     "templo": dict(nombre="Templo japonés", desc="Escalas pentatónicas japonesas, koto, shakuhachi, cuencos y campana de templo; muy lento y espacioso.",
                    bpm=(50, 60), sw=(0, .04), menor=1.0, novena=0, inst=["koto", "cuenco", "cuenco", "pad"],
-                   instMel=["shakuhachi", "shakuhachi", "koto", "campana"], bat=["templo", "templo", "nada"], bajo=["largo"],
+                   instMel=["shakuhachi", "shakuhachi", "koto", "campana"], bat=["templo", "templo", "nada"], bajo=["largo", "pedal"],
                    tex=["lluvia", "cinta"], comp=["arpegio", "largo", "pad"], densidad=["escasa"], guino=0, intro=0,
                    sala=(.4, .65), escalas=["hirajoshi", "hirajoshi", "insen", "yo"], bonsho=.8, partB=.3,
                    progs_propios=[[(0, "5"), (0, "5"), (7, "5"), (0, "5")], [(0, "5"), (3, "5"), (7, "sus2"), (0, "5")],
                                   [(0, "sus2"), (10, "5"), (0, "5"), (7, "5")], [(0, "5"), (5, "sus2"), (0, "5"), (8, "5")]]),
     "nocturno": dict(nombre="Nocturno", desc="Para dormir: muy lento, en menor, cinta antigua y ritmo casi ausente.",
                      bpm=(54, 62), sw=(.04, .1), menor=.85, inst=["pad", "rhodes", "guitarra"],
-                     instMel=["flauta", "saxo", "clarinete", "campana"], bat=["nada", "suave"], bajo=["largo"], tex=["cinta"],
+                     instMel=["flauta", "saxo", "clarinete", "campana"], bat=["nada", "suave"], bajo=["largo", "pedal"], tex=["cinta"],
                      comp=["pad", "arpegio"], densidad=["escasa"], guino=0, sala=(.25, .5)),
     # siete más (2026-10-19) para completar la cuadrícula del panel a 16
     "bossa": dict(nombre="Bossa nova", desc="Aire brasileño: guitarra con acordes de novena, ritmo de bossa, flauta o saxo.",
                   bpm=(76, 88), sw=(.04, .1), menor=.35, novena=.85, inst=["guitarra", "guitarra", "piano"],
                   instMel=["flauta", "saxo", "vibra", "guitarra"], bat=["bossa", "bossa", "suave"], bajo=["rebote", "largo"],
-                  tex=["vinilo"], comp=["charleston", "roto", "arpegio"], densidad=["normal", "escasa"], guino=0, sala=(.08, .25)),
+                  tex=["vinilo"], comp=["bossa", "bossa", "charleston", "roto", "arpegio"], densidad=["normal", "escasa"], guino=0, sala=(.08, .25)),
     "cafe": dict(nombre="Café de mañana", desc="Luminoso y en mayor: piano o guitarra, clarinete, ritmo ligero.",
                  bpm=(74, 86), sw=(.08, .14), menor=.12, inst=["piano", "guitarra", "rhodes"],
-                 instMel=["piano", "clarinete", "flauta", "vibra"], bat=["suave", "medio", "balada"], bajo=["rebote", "largo"],
-                 tex=["vinilo"], comp=["arpegio", "largo", "charleston"], densidad=["normal", "densa"], guino=0, sala=(.1, .3)),
+                 instMel=["piano", "clarinete", "flauta", "vibra"], bat=["suave", "medio", "balada"], bajo=["rebote", "largo", "octavas"],
+                 tex=["vinilo"], comp=["arpegio", "largo", "charleston", "balanceo"], densidad=["normal", "densa"], guino=0, sala=(.1, .3)),
     "invierno": dict(nombre="Invierno", desc="Frío y quieto: pads y vibráfono, campanas lejanas, mucha sala.",
                      bpm=(56, 68), sw=(.02, .08), menor=.65, inst=["pad", "vibra", "piano"],
-                     instMel=["campana", "vibra", "flauta", "cuenco"], bat=["suave", "nada", "balada"], bajo=["largo"],
+                     instMel=["campana", "vibra", "flauta", "cuenco"], bat=["suave", "nada", "balada"], bajo=["largo", "pedal"],
                      tex=["cinta", "vinilo"], comp=["pad", "arpegio", "largo"], densidad=["escasa"], guino=0, intro=.6, sala=(.35, .6)),
     "neon": dict(nombre="Neón", desc="Noche de ciudad con sintes: pads, pulsos, bajo de sinte y saxo.",
                  bpm=(82, 96), sw=(.06, .12), menor=.75, inst=["pad", "pulso", "pad"], instMel=["pulso", "saxo", "vibra", "pulso"],
-                 bat=["boombap", "doble", "roto"], bajo=["rebote", "largo"], bajoTimbre=["sinte", "sub"], tex=["cinta"],
-                 comp=["stabs", "arpegio", "pad"], densidad=["normal"], guino=0, sala=(.05, .2)),
+                 bat=["boombap", "doble", "roto"], bajo=["rebote", "largo", "sincopado"], bajoTimbre=["sinte", "sub"], tex=["cinta"],
+                 comp=["stabs", "arpegio", "pad", "ostinato"], densidad=["normal"], guino=0, sala=(.05, .2)),
     "bosque": dict(nombre="Bosque", desc="Naturaleza: guitarra y koto arpegiados, flauta, pentatónica mayor, lluvia suave.",
                    bpm=(60, 72), sw=(.04, .1), menor=.2, inst=["guitarra", "koto", "pad"],
                    instMel=["flauta", "shakuhachi", "campana", "guitarra"], bat=["nada", "suave", "templo"], bajo=["largo"],
@@ -803,16 +788,16 @@ def instrumentos_de(estilos):
     return [k for k in INST_NOMBRES if k in usados]
 
 
-def con_instrumentos(E, quitar=(), anadir=(), todos=False):
+def con_instrumentos(E, quitar=(), anadir=()):
     """Copia del estilo con los instrumentos que el usuario quita o añade (acordes y melodía).
-    todos=True (botón «Aleatorio»): cualquiera de INST_NOMBRES, sin atender al estilo.
-    Si quita todos: «solo melodía» (sin acordes, bajo ni batería; la melodía sigue con su timbre)."""
+    Si quita todos: «solo melodía» (sin acordes, bajo ni batería; la melodía sigue con su timbre).
+    (El botón «Aleatorio» de instrumentos lo resuelve el alimentador sorteando quitar/añadir.)"""
     E = dict(E)
     if not anadir and all(k in quitar for k in INST_NOMBRES):
         E["solo_melodia"] = True
         return E
     for k in ("inst", "instMel"):
-        base = list(INST_NOMBRES) if todos else E.get(k, TODOS[k])
+        base = E.get(k, TODOS[k])
         lista = [x for x in base if x not in quitar] + [x for x in anadir if x not in base and x in INST_NOMBRES]
         E[k] = lista or [x for x in TODOS[k] if x not in quitar] or list(TODOS[k])
     return E
@@ -899,7 +884,7 @@ def tema_aleatorio(seed, estilo="aleatorio", E=None):
         **({"escala": escala} if escala else {}),
         **({"bonsho": True} if rng.random() < E.get("bonsho", 0) else {}),
     )
-    if tema["inst"] == "pad" and tema["comp"] in ("stabs", "charleston", "roto"):
+    if tema["inst"] == "pad" and tema["comp"] in ("stabs", "charleston", "roto", "ostinato", "bossa"):
         tema["comp"] = "pad"   # un pad no se toca a golpes cortos
     if rng.random() < E.get("partB", .5):   # parte B con otra vuelta de acordes
         otra = con9(progs[rng.integers(len(progs))])
@@ -924,121 +909,8 @@ def tema_aleatorio(seed, estilo="aleatorio", E=None):
     por_compas = [_acorde_en(acordes, tema["ritmo_armonico"], c, 0) for c in range(4)]
     tema["mel"], tema["mel_dur"] = _mel_aleatoria(rng, tonica, por_compas, menor, elige("densidad"),
                                                   ESCALAS.get(escala), tema["registro"])
-    tema["raiz"] = tonica   # para poder componer otra melodía sobre los mismos acordes (radio infinita)
+    tema["raiz"] = tonica   # tónica real (la usan el bonshō y piezas.py)
     return tema
-
-
-# ── radio infinita: tramos encadenados que cambian poco a poco ──
-
-_GRUPOS = {   # parámetros que viajan juntos al pasar de un tramo al siguiente
-    "armonia": ("modo", "acordes", "acordesB", "mel", "mel_dur", "guino", "tonica", "raiz", "escala", "bonsho",
-                "ritmo_armonico", "voicing", "registro"),
-    "forma": ("estructura", "ghost", "hats_var"),
-    "inst": ("inst", "acordesArriba"), "instMel": ("instMel",), "bat": ("bat", "kit", "break"), "bajo": ("bajo", "bajoTimbre", "bajoNivel", "bajoGrave"),
-    "comp": ("comp",), "tex": ("tex", "texVol"), "sala": ("sala",), "lofi": ("lofi", "graves"), "niveles": ("niveles",),
-}
-_ACOTADOS = ("inst", "instMel", "bat", "bajo", "tex", "comp")   # listas que cada estilo restringe
-_RANGO_GRUPO = {"lofi": "lofi", "graves": "lofi", "bajoNivel": "bajo", "charles": "bat", "bombo": "bat"}
-
-
-MELODIA = {0: (0, 0), 1: (2, 3), 2: (4, 5), 3: (12, 12)}   # nivel → (mín, máx) compases con melodía de los 12 de A/B
-
-
-def tema_siguiente(prev, seed, estilo="aleatorio", bpm=None, quitar=(), anadir=(), melodia=1, inst_todos=False, minimo=False):
-    """Compone el tramo siguiente de la radio infinita: hereda casi todo del anterior y cambia
-    uno o dos grupos de parámetros. Si el estilo pedido no admite algo del tramo anterior
-    (instrumento, batería…), lo va acercando al estilo de dos en dos cosas por tramo, así el
-    cambio de estilo se nota poco a poco. bpm fijo si se da; si no, deriva dentro del estilo."""
-    E = con_instrumentos(estilo_de(estilo), quitar, anadir, inst_todos)
-    rng = np.random.default_rng(seed)
-    nuevo = tema_aleatorio(int(rng.integers(1 << 30)), estilo, E)
-    if prev is None:
-        T = nuevo
-    else:
-        T = dict(prev)
-        T.pop("intro_filtro", None)
-        fuera = [g for g in _ACOTADOS if g in E and prev.get(g) not in E[g]]
-        # rangos del estilo (filtro, graves, nivel del bajo, charles, bombo): si el valor que sonaba se sale
-        # del rango del estilo pedido, su grupo también tiene que cambiar (así el «anime» gana sus graves al
-        # entrar y los pierde poco a poco al salir)
-        valores = {"lofi": prev.get("lofi"), "graves": prev.get("graves", 0), "bajoNivel": prev.get("bajoNivel", 1),
-                   "charles": prev.get("kit", {}).get("hv", 1), "bombo": prev.get("kit", {}).get("kv", 1)}
-        for clave, (lo, hi) in RANGOS_DEF.items():
-            lo, hi = E.get(clave, (lo, hi))
-            v = valores[clave]
-            if v is not None and not (lo - 1e-6 <= v <= hi + 1e-6) and _RANGO_GRUPO[clave] not in fuera:
-                fuera.append(_RANGO_GRUPO[clave])
-        for clave, grupo in (("acordesArriba", "inst"), ("bajoGrave", "bajo")):   # los interruptores del estilo, igual
-            if bool(prev.get(clave)) != bool(E.get(clave)) and grupo not in fuera:
-                fuera.append(grupo)
-        cambios = set(fuera[:2])
-        sin_armonia = prev.get("sin_armonia", 0) + 1
-        if minimo:
-            # cambio pedido por el usuario (instrumento, estilo…): solo lo imprescindible, para que entre
-            # de forma natural; el instrumento recién añadido pasa a llevar la melodía
-            if anadir and anadir[-1] not in (prev.get("inst"), prev.get("instMel")) and anadir[-1] in INST_NOMBRES:
-                cambios.add("instMel")
-        else:
-            # variedad: 2 o 3 grupos nuevos por tramo, y acordes/tonalidad nuevos como mínimo cada 3 tramos
-            n = 2 + int(rng.random() < .4)
-            if sin_armonia >= 3 or rng.random() < .3:
-                cambios.add("armonia")
-            libres = [g for g in _GRUPOS if g not in cambios]
-            cambios.update(str(g) for g in rng.choice(libres, size=min(n, len(libres)), replace=False))
-        for g in cambios:
-            for k in _GRUPOS[g]:
-                if k in nuevo:
-                    T[k] = nuevo[k]
-                else:
-                    T.pop(k, None)
-            if g in _ACOTADOS:   # que el cambio se note: nunca repetir el valor que ya sonaba
-                opciones = [x for x in E.get(g, TODOS[g]) if x != prev.get(g)]
-                if opciones:
-                    T[g] = str(rng.choice(opciones))
-        if minimo and anadir and "instMel" in cambios and anadir[-1] in E.get("instMel", []):
-            T["instMel"] = anadir[-1]
-        T["sin_armonia"] = 0 if "armonia" in cambios else sin_armonia
-        if "armonia" not in cambios and not minimo and rng.random() < .7:   # otra melodía sobre los mismos acordes
-            dens = str(rng.choice(E.get("densidad", TODOS["densidad"])))
-            por_compas = [_acorde_en(T["acordes"], T.get("ritmo_armonico", "compas"), c, 0) for c in range(4)]
-            T["mel"], T["mel_dur"] = _mel_aleatoria(rng, T["raiz"], por_compas, T["modo"] == "menor", dens,
-                                                    ESCALAS.get(T.get("escala")), T.get("registro"))
-        if T["inst"] == "pad" and T["comp"] in ("stabs", "charleston", "roto"):
-            T["comp"] = "pad"
-        if "bat" in cambios or "armonia" in cambios:
-            T["sw"] = nuevo["sw"]
-        T["bpm"] = prev["bpm"]
-    T.pop("guino", None)   # sin guiños de 8 bits en la radio infinita (al usuario le sonaban a videojuego)
-    T["solo_melodia"] = bool(E.get("solo_melodia"))   # todos los instrumentos quitados: solo la melodía, continua
-    # cuánta melodía: en qué compases de A/B (2..13) suena el gancho, en frases de dos compases.
-    # Por defecto «de vez en cuando»: el usuario se quejaba de que el gancho sonaba siempre y parecía el mismo
-    lo, hi = MELODIA.get(int(melodia), MELODIA[1])
-    k = int(rng.integers(lo, hi + 1))
-    if k >= 12:
-        T["mel_compases"] = list(range(2, 14))
-    else:
-        inicios = [2, 4, 6, 8, 10, 12]
-        elegidos = sorted(int(x) for x in rng.choice(inicios, size=min((k + 1) // 2, len(inicios)), replace=False))
-        T["mel_compases"] = sorted({c for i in elegidos for c in (i, i + 1)})[:max(k, 0)]
-    # más armónico: la melodía no sube de dos octavas y una cuarta sobre la raíz, la parte B no
-    # salta una octava, y fuera del retro no hay timbres percusivos en la melodía
-    techo = T["raiz"] + 29
-    T["mel"] = [[(m - 12 if m and m > techo else m) for m in fr] for fr in T["mel"]]
-    T["subeB"] = False
-    suave = {"caja": "vibra", "chip": "pulso"}
-    if T["instMel"] in suave and "chip" not in E.get("instMel", []):
-        T["instMel"] = suave[T["instMel"]]
-    if bpm:
-        T["bpm"] = int(bpm)
-    elif prev is not None and not minimo:   # deriva: hacia el rango del estilo, como mucho 4 bpm por tramo
-        lo, hi = (int(x) for x in E.get("bpm", (60, 92)))
-        objetivo = min(max(T["bpm"], lo), hi)
-        if objetivo != T["bpm"]:
-            T["bpm"] += max(-4, min(4, objetivo - T["bpm"]))
-        elif rng.random() < .5:
-            T["bpm"] = min(max(T["bpm"] + int(rng.integers(-5, 6)), lo), hi)
-    T["cambios"] = sorted(cambios) if prev is not None else []
-    return T
 
 
 def generate_random(seed, outdir, estilo="aleatorio", fondo=1.0):

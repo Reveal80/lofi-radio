@@ -6,7 +6,9 @@
 <title>Radio Lofi 24/7</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- fuentes sin bloquear el pintado: si no hay internet se usan las del sistema (hls.js ya va en local) -->
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
 <style>
   :root {
     --bg0: #07060f; --bg1: #110e24; --bg2: #1c1433;
@@ -54,7 +56,7 @@
   .brand h1 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
   .brand small { font: 500 10px var(--mono); color: var(--dim); letter-spacing: .14em; text-transform: uppercase; }
   .brand .ver { font-size: 9px; letter-spacing: .04em; text-transform: none; color: var(--dim); opacity: .8; margin-left: 4px; }
-  .stats { display: flex; gap: 8px; margin-left: auto; }
+  .stats { display: flex; gap: 8px; }
   .stat {
     display: flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 99px;
     background: var(--glass); border: 1px solid var(--stroke); font-size: 13px; color: var(--muted);
@@ -86,7 +88,6 @@
   .escena.on { color: var(--ink); border-color: rgba(255,111,145,.7); background: rgba(255,111,145,.12); }
   .upwrap { position: relative; margin-left: auto; }
   .upwrap + .search { margin-left: 8px; }
-  .uppop { left: auto; right: 0; width: 380px; }
   .uppop .drop { margin: 0; }
   #g-open.busy { color: var(--ink); border-color: rgba(255,111,145,.5); background: rgba(255,111,145,.1); }
   #g-open.busy svg { color: var(--rose); animation: spin 2.4s linear infinite; }
@@ -189,7 +190,6 @@
   .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px;
           font: 500 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
           background: rgba(0,0,0,.45); border: 1px solid var(--stroke-2); color: var(--muted); }
-  .pill.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
   .pill.warn { color: var(--amber); border-color: rgba(255,179,92,.45); background: rgba(255,179,92,.1); }
 
   /* ---------- hero / reproductor central ---------- */
@@ -259,7 +259,7 @@
   .tdur { font: 12px var(--mono); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
   .tdel { opacity: 0; }
   .track:hover .tdel { opacity: 1; }
-  .tdel:hover { color: var(--rose) !important; background: rgba(255,111,145,.12) !important; }
+  .tdel:hover { color: var(--rose); background: rgba(255,111,145,.12); }
   .track .mini { position: absolute; left: 12px; right: 12px; bottom: 4px; height: 2px; border-radius: 2px;
                  background: rgba(255,255,255,.06); overflow: hidden; display: none; }
   .track.activo .mini { display: block; }
@@ -282,13 +282,7 @@
   .broadcast .rings::before, .broadcast .rings::after { content: ""; position: absolute; inset: 0; border-radius: 50%;
         border: 2px solid var(--dim); opacity: .3; }
   .broadcast.live { border-color: rgba(255,77,109,.5); background: radial-gradient(circle at 50% 0, rgba(255,77,109,.25), rgba(0,0,0,.3) 70%); }
-  .broadcast.live .rings svg { color: var(--live); }
-  .broadcast.live .rings::before, .broadcast.live .rings::after { border-color: var(--live); animation: ring 2s ease-out infinite; }
-  .broadcast.live .rings::after { animation-delay: 1s; }
   .broadcast.test { border-color: rgba(255,179,92,.45); background: radial-gradient(circle at 50% 0, rgba(255,179,92,.18), rgba(0,0,0,.3) 70%); }
-  .broadcast.test .rings svg { color: var(--amber); }
-  .broadcast.test .rings::before, .broadcast.test .rings::after { border-color: var(--amber); animation: ring 2s ease-out infinite; }
-  @keyframes ring { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(1.5); opacity: 0; } }
   .watch { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 12px; border-radius: 13px;
            background: rgba(0,0,0,.2); border: 1px solid var(--stroke); font-size: 12.5px; color: var(--muted); }
   .watch svg { width: 18px; height: 18px; flex: none; margin-top: 1px; }
@@ -359,20 +353,17 @@
   .modal h3 { margin: 0 0 6px; font-size: 19px; }
   .modal p { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
   .modal .acts { display: flex; gap: 10px; justify-content: flex-end; }
-  .qprog { height: 3px; border-radius: 3px; background: rgba(255,255,255,.08); margin-top: 5px; overflow: hidden; display: none; }
+  .qprog { border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; display: none; }   /* alto y posición los pone cada sitio (.mlive, .vitem) */
   .qprog i { display: block; height: 100%; width: 0; background: var(--grad); }
-  .qctl { grid-column: 3; display: flex; align-items: center; gap: 2px; }
-  .hours { display: flex; align-items: center; gap: 4px; padding: 3px 8px 3px 4px; border-radius: 9px;
-           background: rgba(0,0,0,.3); border: 1px solid var(--stroke); margin-right: 4px; }
+  .qctl { display: flex; align-items: center; gap: 2px; }
+  .hours { display: flex; align-items: center; gap: 2px; padding: 2px 10px 2px 4px; border-radius: 9px;
+           background: rgba(0,0,0,.3); border: 1px solid var(--stroke); }   /* tiempo en bucle: horas + minutos */
   .hours:focus-within { border-color: rgba(155,123,255,.6); }
-  .hours input { width: 46px; background: none; border: none; outline: none; color: var(--ink);
-                 font: 600 13px var(--mono); text-align: right; }
-  .hours span { font: 11px var(--mono); color: var(--dim); }
-  .hours.tiempo { gap: 2px; padding: 2px 10px 2px 4px; }
-  .hours.tiempo input { width: 34px; padding: 4px 2px; text-align: center; border-radius: 6px; -moz-appearance: textfield; appearance: textfield; }
-  .hours.tiempo input:hover, .hours.tiempo input:focus { background: rgba(255,255,255,.08); }
-  .hours.tiempo input::-webkit-inner-spin-button, .hours.tiempo input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-  .hours.tiempo span { margin-right: 4px; }
+  .hours input { width: 34px; padding: 4px 2px; background: none; border: none; outline: none; color: var(--ink); font: 600 13px var(--mono);
+                 text-align: center; border-radius: 6px; -moz-appearance: textfield; appearance: textfield; }
+  .hours input:hover, .hours input:focus { background: rgba(255,255,255,.08); }
+  .hours input::-webkit-inner-spin-button, .hours input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .hours span { font: 11px var(--mono); color: var(--dim); margin-right: 4px; }
   .qctl .iconbtn { width: 26px; height: 26px; border-radius: 8px; }
   .qctl .iconbtn svg { width: 14px; height: 14px; }
   .qctl .qdel:hover { color: var(--rose); background: rgba(255,111,145,.12); }
@@ -388,11 +379,9 @@
   [hidden] { display: none !important; }
 
   /* ---------- música: canción del directo ---------- */
-  .mtools { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 10px; padding: 0 10px 12px; }
-  #pane-videos .mtools, #pane-musica .mtools { grid-template-columns: minmax(0,1fr) auto auto auto; }
+  .mtools { display: grid; grid-template-columns: minmax(0,1fr) auto auto auto; gap: 10px; padding: 0 10px 12px; }
   .vinf-chip i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
   .btn.inf { gap: 7px; } .btn.inf svg { width: 18px; height: 18px; }
-  .btn.inf.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
   .btn.inf.on svg { animation: spin 6s linear infinite; }
   .infpanel { margin: 0 10px 12px; padding: 12px 14px; border-radius: 14px; background: rgba(94,230,160,.05); border: 1px solid rgba(94,230,160,.22); display: flex; flex-direction: column; gap: 10px; }
   .infpanel .ih { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
@@ -402,7 +391,6 @@
   .inf-inst { display: flex; align-items: flex-start; gap: 10px; font-size: 12.5px; color: var(--muted); }
   .inf-inst > span { padding-top: 3px; white-space: nowrap; }
   .chip.rnd { cursor: pointer; opacity: 1 !important; text-decoration: none !important; flex: none; padding: 3px 7px; order: 99; }
-  .chip.rnd.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
   .inf-inst .chips { display: flex; flex-wrap: wrap; gap: 5px; }
   .inf-inst .chip { cursor: pointer; opacity: .4; text-decoration: line-through; transition: all .15s; }
   .inf-inst .chip:hover { opacity: .8; }
@@ -417,19 +405,17 @@
   .inf-tempo input[type=range]::-moz-range-thumb { width: 16px; height: 16px; background: var(--amber); box-shadow: 0 0 0 4px rgba(255,179,92,.25); }
   .inf-tempo .lim { font: 10.5px var(--mono); color: var(--dim); }
   .inf-tempo .bpm { font: 700 13px var(--mono); color: var(--ink); min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
-  .inf-tempo .btn.sm.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
   #inf-tex { font-size: 12px; }
-  .infpanel .now { font: 11.5px var(--mono); color: var(--dim); }
   .optrow { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
   .optrow small { color: var(--dim); }
   .inf-rota { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
   .inf-rota .chip { cursor: pointer; } .inf-rota .chip:hover { color: var(--ink); border-color: var(--stroke-2); }
-  .inf-rota .chip.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
   .inf-rota small { margin-left: auto; font: 11px var(--mono); color: var(--dim); }
-  @media (max-width: 900px) { .infpanel .escenas { grid-template-columns: repeat(4, 1fr); } }
   .btn.shuffle { padding: 0; width: 40px; align-self: stretch; justify-content: center; color: var(--muted); }
   .btn.shuffle svg { width: 17px; height: 17px; }
-  .btn.shuffle.on { color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
+  /* estado «activo» en verde, compartido por pastillas, chips y botones conmutables */
+  .pill.on, .btn.inf.on, .btn.shuffle.on, .chip.rnd.on, .inf-rota .chip.on, .inf-tempo .btn.sm.on {
+    color: var(--ok); border-color: rgba(94,230,160,.45); background: rgba(94,230,160,.1); }
   .mlive { position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 14px; overflow: hidden;
            background: rgba(0,0,0,.25); border: 1px solid var(--stroke); }
   .mlive.on { border-color: rgba(255,77,109,.45); background: linear-gradient(90deg, rgba(255,77,109,.14), rgba(0,0,0,.2) 70%); }
@@ -443,11 +429,10 @@
   .track.busyrow { cursor: default; background: rgba(155,123,255,.07); outline: 1px dashed rgba(155,123,255,.4); outline-offset: -1px; }
   .track .ttl { display: flex; align-items: center; gap: 6px; min-width: 0; }
   .track .ttl .ttitle { min-width: 0; }
-  .track .ldot { flex: none; font: 600 9.5px var(--mono); letter-spacing: .08em; padding: 2px 7px; border-radius: 99px;
-                 color: #fff; background: var(--live); }
+  .ldot { flex: none; font: 600 9.5px var(--mono); letter-spacing: .08em; padding: 2px 7px; border-radius: 99px;
+          color: #fff; background: var(--live); }   /* etiqueta «EN DIRECTO» en canciones y videos */
   .track.endirecto { box-shadow: inset 3px 0 0 var(--live); }
   .track.endirecto .tsub { color: var(--rose); }
-  .track .vedit { opacity: 0; } .track:hover .vedit { opacity: .8; }
   .pb-tag { display: inline-block; font: 600 9px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--cyan);
             border: 1px solid rgba(92,225,230,.4); border-radius: 99px; padding: 1px 7px; margin-bottom: 3px; }
   .vinfo-line { margin: 0 16px 10px; }
@@ -462,7 +447,6 @@
   .vitem.off .vthumb2, .vitem.off .vname { opacity: .45; }
   .vitem.off .vname:focus-within { opacity: 1; }
   .vitem.emitiendo { background: linear-gradient(90deg, rgba(255,111,145,.14), rgba(155,123,255,.06)); box-shadow: inset 3px 0 0 var(--live); }
-  .vtitle .ldot { flex: none; font: 600 9.5px var(--mono); letter-spacing: .08em; padding: 2px 7px; border-radius: 99px; color: #fff; background: var(--live); }
   .vpos { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; font: 600 12px var(--mono);
           color: var(--muted); background: rgba(255,255,255,.06); transition: all .2s; }
   .vpos svg { width: 15px; height: 15px; display: none; }
@@ -477,7 +461,7 @@
   .vlink { width: 24px; height: 24px; border-radius: 7px; flex: none; color: var(--ok); opacity: .75; display: inline-grid; place-items: center; }
   .vlink:hover { opacity: 1; background: rgba(94,230,160,.12); } .vlink svg { width: 13px; height: 13px; }
   .vedit svg { width: 13px; height: 13px; }
-  .vitem:hover .vedit { opacity: .8; } .vedit:hover { opacity: 1 !important; }
+  .vitem:hover .vedit, .track:hover .vedit { opacity: .8; } .vedit:hover { opacity: 1; }
   .vrename { width: 100%; max-width: 420px; font: 600 14px var(--sans); color: var(--ink); background: rgba(0,0,0,.4);
              border: 1px solid rgba(155,123,255,.7); border-radius: 8px; padding: 4px 8px; outline: none;
              box-shadow: 0 0 0 3px rgba(155,123,255,.18); }
@@ -500,21 +484,15 @@
   .vitem .qctl .iconbtn { opacity: .55; } .vitem:hover .qctl .iconbtn:not(:disabled) { opacity: 1; }
   .vitem[data-i] { cursor: grab; }
   .track[data-name] { cursor: grab; }
-  .track .grip { color: var(--dim); display: grid; place-items: center; opacity: .5; touch-action: none; }
-  .track .grip svg { width: 10px; height: 16px; }
-  .track:hover .grip { opacity: 1; color: var(--muted); }
-  .track.hueco { background: rgba(155,123,255,.08) !important; outline: 1.5px dashed rgba(155,123,255,.55); outline-offset: -2px; }
-  .track.hueco > * { visibility: hidden; }
-  .track.fantasma { position: fixed; z-index: 70; pointer-events: none; animation: none; background: rgba(30,22,58,.97) !important;
-                    box-shadow: 0 18px 50px rgba(0,0,0,.6), 0 0 0 1px rgba(255,111,145,.5); transform: scale(1.02) rotate(-.4deg); }
-  .vitem .grip { color: var(--dim); display: grid; place-items: center; opacity: .5; transition: opacity .2s; touch-action: none; }
-  .vitem .grip svg { width: 10px; height: 16px; }
-  .vitem:hover .grip { opacity: 1; color: var(--muted); }
-  .vitem.hueco { background: rgba(155,123,255,.08) !important; outline: 1.5px dashed rgba(155,123,255,.55); outline-offset: -2px; }
-  .vitem.hueco > * { visibility: hidden; }
-  .vitem.fantasma { position: fixed; z-index: 70; pointer-events: none; cursor: grabbing; animation: none;
-                    background: rgba(30,22,58,.97) !important; box-shadow: 0 18px 50px rgba(0,0,0,.6), 0 0 0 1px rgba(255,111,145,.5);
-                    transform: scale(1.02) rotate(-.4deg); }
+  /* arrastre para ordenar (canciones y videos): asa, hueco que deja la fila y copia «fantasma» que sigue al puntero */
+  .grip { color: var(--dim); display: grid; place-items: center; opacity: .5; transition: opacity .2s; touch-action: none; }
+  .grip svg { width: 10px; height: 16px; }
+  .track:hover .grip, .vitem:hover .grip { opacity: 1; color: var(--muted); }
+  .hueco { background: rgba(155,123,255,.08) !important; outline: 1.5px dashed rgba(155,123,255,.55); outline-offset: -2px; }
+  .hueco > * { visibility: hidden; }
+  .fantasma { position: fixed; z-index: 70; pointer-events: none; cursor: grabbing; animation: none;
+              background: rgba(30,22,58,.97) !important; box-shadow: 0 18px 50px rgba(0,0,0,.6), 0 0 0 1px rgba(255,111,145,.5);
+              transform: scale(1.02) rotate(-.4deg); }
   body.arrastrando, body.arrastrando * { cursor: grabbing !important; user-select: none; }
   .vitem.busy { cursor: default; background: rgba(155,123,255,.07); border: 1px dashed rgba(155,123,255,.4); margin-bottom: 4px; }
   .vitem.busy .vthumb2 { display: grid; place-items: center; background: rgba(0,0,0,.35); cursor: default; }
@@ -578,7 +556,6 @@
   .sx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 10px; }
   .sx { padding: 12px 14px; border-radius: 14px; background: var(--glass); border: 1px solid var(--stroke); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
   .sx .k { font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
-  .sx .k svg { width: 13px; height: 13px; flex: none; }
   .sx .v { font: 700 22px/1.1 var(--sans); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sx .v small { font: 500 12px var(--mono); color: var(--muted); margin-left: 4px; }
   .sx .d { font: 11px/1.4 var(--mono); color: var(--dim); }
@@ -611,9 +588,10 @@
     .compose-wrap { position: static; }
     .popover, #px-pop { right: 12px; left: auto; width: min(440px, calc(100vw - 24px)); top: calc(100% + 8px);
                         max-height: calc(100dvh - 80px); overflow: auto; }
+    .infpanel .escenas { grid-template-columns: repeat(4, 1fr); }
   }
   @media (max-width: 860px) {
-    .grid { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+    .grid { padding: 16px; }
     .genrow { grid-template-columns: 120px minmax(0,1fr); }
     .col.right { display: flex; }
     .topbar { padding: 8px 12px; gap: 8px; }
@@ -638,13 +616,13 @@
     html { overflow-x: hidden; }
     .topbar { flex-wrap: wrap; white-space: normal; gap: 6px 8px; padding: 8px 10px; }
     .brand { flex: 1 0 100%; }
-    .compose-wrap, .pixa-wrap + .compose-wrap, .stats { margin-left: 0; }
+    .compose-wrap, .pixa-wrap + .compose-wrap { margin-left: 0; }
     .stats { flex-wrap: wrap; gap: 6px; }
     .popover, #px-pop { left: 10px; right: 10px; width: auto; }
     .grid { padding: 10px; gap: 12px; }
     .card { padding: 14px 12px; }
     .hero { grid-template-columns: 1fr; gap: 10px; }
-    .mtools, #pane-videos .mtools, #pane-musica .mtools { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 0 10px; }
+    .mtools { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 0 10px; }
     .mtools .mlive { flex: 1 0 100%; }
     .mtools .btn { flex: 1 1 auto; justify-content: center; }
     .infpanel { margin: 0 0 12px; padding: 10px; }
@@ -678,7 +656,7 @@
     .pb-ctrl { gap: 8px; }
     .pb-play { width: 36px; height: 36px; }
     .pb-cover { width: 36px; height: 36px; border-radius: 9px; }
-    .popover, #px-pop { max-height: calc(100dvh - 70px); }
+    .popover, #px-pop { max-height: calc(100dvh - 70px); overflow: auto; }
   }
 </style>
 </head>
@@ -776,7 +754,7 @@
       </div>
     </div>
   </div>
-  <div class="stats" style="margin-left:0">
+  <div class="stats">
     <div class="stat"><svg viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><b id="st-tracks">–</b><span class="lbl">pistas</span></div>
     <div class="stat"><svg viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><b id="st-mins">–</b><span class="lbl">min</span></div>
   </div>
@@ -834,7 +812,7 @@
       <div class="tabpane" id="pane-musica" hidden>
         <div class="mtools">
           <div class="mlive" id="m-live">
-            <span class="pill live" id="m-live-pill">● EN DIRECTO</span>
+            <span class="pill live">● EN DIRECTO</span>
             <div class="mlive-txt"><b id="m-live-t">La emisión está parada</b><small id="m-live-r">la música del directo aparecerá aquí</small></div>
             <div class="qprog"><i id="m-live-bar"></i></div>
           </div>
@@ -852,9 +830,9 @@
           <div class="ih"><b>Radio infinita</b><span>la música se compone sola mientras suena. Marca uno o varios estilos (con varios, va rotando) y el tempo; los cambios entran en el siguiente compás</span><small id="inf-now"></small></div>
           <div class="escenas" id="inf-estilos"></div>
           <div class="inf-rota" id="inf-rota" hidden><span>Con varios estilos:</span><button class="chip" data-min="0" title="Un solo estilo que suma los marcados: instrumentos, ritmos y tempos de todos ellos">Mezclar</button><span style="color:var(--dim)">o cambiar cada</span><button class="chip" data-min="15">15 min</button><button class="chip" data-min="30">30 min</button><button class="chip" data-min="60">1 h</button><button class="chip" data-min="120">2 h</button><button class="chip" data-min="240">4 h</button><small id="inf-rota-txt"></small></div>
-          <div class="inf-inst" id="inf-inst"><span title="Los del estilo van marcados; pulsa uno para quitarlo o para añadir otro. Entra en el siguiente tramo">Instrumentos</span><div class="chips" id="inf-inst-chips"><small id="inf-inst-nota" style="width:100%;order:100;font:11px var(--mono);color:var(--ok)"></small><button class="chip rnd" id="inf-inst-rnd" onclick="alternarAzar('inst_aleatorio')" aria-label="aleatorio" title="Sortea una combinación de 2 a 4 instrumentos (sin los que hayas quitado) y cambiará cada 30 minutos"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button></div></div>
+          <div class="inf-inst"><span title="Los del estilo van marcados; pulsa uno para quitarlo o para añadir otro. Entra en el siguiente tramo">Instrumentos</span><div class="chips" id="inf-inst-chips"><small id="inf-inst-nota" style="width:100%;order:100;font:11px var(--mono);color:var(--ok)"></small><button class="chip rnd" id="inf-inst-rnd" onclick="alternarAzar('inst_aleatorio')" aria-label="aleatorio" title="Sortea una combinación de 2 a 4 instrumentos (sin los que hayas quitado) y cambiará cada 30 minutos"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button></div></div>
           <div class="inf-rota" id="inf-mel"><span title="Cuántos compases llevan melodía; el resto son acordes y bajo">Melodía</span><button class="chip" data-mel="0">ninguna</button><button class="chip" data-mel="1">de vez en cuando</button><button class="chip" data-mel="2">normal</button><button class="chip" data-mel="3">continua</button><button class="chip rnd" id="inf-mel-rnd" onclick="alternarAzar('melodia_aleatoria')" aria-label="aleatorio" title="Sortea un nivel de melodía y cambiará cada 30 minutos"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button><span id="inf-var" style="display:inline-flex;align-items:center;gap:6px;margin-left:18px;order:100"><span title="Cuánto se separan unas piezas de otras: tonalidad, tempo, estructura, variaciones de la melodía y cambios de instrumento. Afecta a cómo se compone, no a cuántas notas hay">Variedad</span><button class="chip" data-var="bajo" title="Piezas parecidas entre sí: tonalidades vecinas, tempo casi fijo, forma sencilla (intro, A, B, A, cierre), pocas variaciones">baja</button><button class="chip" data-var="medio" title="Equilibrado: descansos y puentes, variaciones del motivo, algún cambio de timbre en la B">media</button><button class="chip" data-var="alto" title="Cada pieza se va lejos: cualquier tonalidad y tempo, secciones B en el relativo, más variaciones y cambios de instrumento">alta</button></span></div>
-          <div class="inf-tempo" id="inf-tempo">
+          <div class="inf-tempo">
             <span>Tempo</span><span class="lim">50</span>
             <input type="range" id="inf-bpm" min="50" max="110" step="1" value="76" aria-label="tempo en bpm">
             <span class="lim">110</span>
@@ -952,11 +930,11 @@
         VLC<b id="s-vlcurl"></b>
         <button class="iconbtn" onclick="copiarVlc()" title="copiar enlace"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
       </div>
-      <div class="vlcline ytline" id="s-yt">
+      <div class="vlcline ytline">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="flex:none; color:#ff4d4d"><path d="M23 7.1a3 3 0 0 0-2.1-2.1C19 4.5 12 4.5 12 4.5s-7 0-8.9.5A3 3 0 0 0 1 7.1 31 31 0 0 0 .5 12a31 31 0 0 0 .5 4.9 3 3 0 0 0 2.1 2.1c1.9.5 8.9.5 8.9.5s7 0 8.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .5-4.9 31 31 0 0 0-.5-4.9zM9.8 15.5v-7l6 3.5z"/></svg>
         YouTube<b id="s-yturl" title="">añade el enlace de tu canal o directo</b>
         <a class="btn sm primary ytopen" id="s-ytopen" href="#" target="_blank" rel="noopener" hidden title="Abrir tu canal o directo de YouTube en otra pestaña">Abrir</a>
-        <button class="iconbtn" id="s-ytedit" onclick="editarYoutube()" title="guardar o cambiar el enlace de YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+        <button class="iconbtn" onclick="editarYoutube()" title="guardar o cambiar el enlace de YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
       </div>
       <div class="btnpair">
         <button id="s-live" class="btn live" onclick="startStream()">
@@ -973,7 +951,7 @@
 </main>
 
 <!-- ============ reproductor ============ -->
-<footer class="playerbar" id="pbar">
+<footer class="playerbar">
   <div class="pb-now" title="Reproductor para escuchar en este navegador; no afecta al directo"><div class="pb-cover" id="pb-cover"></div><div><span class="pb-tag">escucha local</span><b id="pb-title">Nada sonando</b><small id="pb-sub">elige una canción para escucharla aquí</small></div></div>
   <div class="pb-center">
     <div class="pb-ctrl">
@@ -1016,7 +994,7 @@
       <button class="iconbtn" onclick="cerrarStats()" title="cerrar (Esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
   </div>
-  <div class="sx-body" id="sx-body">
+  <div class="sx-body">
     <section class="sx-sec">
       <h3>Contenedor de la radio <small id="sx-c-info"></small></h3>
       <div class="sx-grid">
@@ -1261,45 +1239,53 @@ function drawViz(t) {
 requestAnimationFrame(drawViz);
 
 // ---------------- cielo nocturno de fondo ----------------
+// La luna, su halo y los edificios con sus ventanas fijas se dibujan una vez en un canvas fuera de pantalla
+// (solo cambia al redimensionar); cada fotograma es ese dibujo + las estrellas + las pocas ventanas que parpadean.
+// Así el repintado continuo (que obliga a recalcular los desenfoques de las tarjetas) cuesta mucho menos.
 const sky = $("sky"), sctx = sky.getContext("2d");
-let stars = [], skyline = [];
+let stars = [], parpadeo = [], fondo = null;
 function buildSky() {
   const w = innerWidth, h = innerHeight, dpr = devicePixelRatio || 1;
   sky.width = w * dpr; sky.height = h * dpr; sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   stars = Array.from({length: Math.floor(w * h / 5000)}, () => ({x: rnd() * w, y: rnd() * h * .75, r: rnd() * 1.2 + .2, p: rnd() * 6.28, s: .5 + rnd() * 1.5}));
-  skyline = []; let x = 0;
-  while (x < w) {
-    const bw = 40 + rnd() * 90, bh = 40 + rnd() * 130, wins = [];
-    for (let k = 0; k < bw * bh / 500; k++) if (rnd() < .45) wins.push([x + 5 + rnd() * (bw - 12), h - bh + 6 + rnd() * (bh - 14), rnd()]);
-    skyline.push({x, bw, bh, wins}); x += bw + 2 + rnd() * 12;
+  fondo = document.createElement("canvas"); fondo.width = w * dpr; fondo.height = h * dpr;
+  const f = fondo.getContext("2d"); f.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // luna
+  const mx = w * .82, my = h * .16;
+  const halo = f.createRadialGradient(mx, my, 10, mx, my, 160);
+  halo.addColorStop(0, "rgba(255,220,170,.22)"); halo.addColorStop(1, "rgba(255,220,170,0)");
+  f.fillStyle = halo; f.beginPath(); f.arc(mx, my, 160, 0, 6.28); f.fill();
+  f.fillStyle = "rgba(255,236,205,.35)"; f.beginPath(); f.arc(mx, my, 34, 0, 6.28); f.fill();
+  // edificios: las ventanas encendidas fijas van al fondo; las que parpadean (~15 %) se guardan aparte
+  f.globalAlpha = .55; parpadeo = [];
+  for (let x = 0; x < w;) {
+    const bw = 40 + rnd() * 90, bh = 40 + rnd() * 130;
+    f.fillStyle = "#06050c"; f.fillRect(x, h - bh, bw, bh);
+    for (let k = 0; k < bw * bh / 500; k++) if (rnd() < .45) {
+      const wx = x + 5 + rnd() * (bw - 12), wy = h - bh + 6 + rnd() * (bh - 14), v = rnd();
+      if (v > .15) { f.fillStyle = "rgba(255,179,92,.7)"; f.fillRect(wx, wy, 3, 3); } else parpadeo.push([wx, wy, v]);
+    }
+    x += bw + 2 + rnd() * 12;
   }
 }
 function drawSky(t) {
-  if (document.hidden) { setTimeout(() => requestAnimationFrame(drawSky), 1000); return; }
+  // con la pestaña oculta, o con un cajón o desplegable abierto encima, no se dibuja (se vuelve a mirar cada segundo)
+  if (document.hidden || document.querySelector(".drawer.open, .popover.open, .modal.open")) { setTimeout(() => requestAnimationFrame(drawSky), 1000); return; }
   const w = innerWidth, h = innerHeight;
   sctx.clearRect(0, 0, w, h);
+  sctx.fillStyle = "#fff";
   for (const s of stars) {
     sctx.globalAlpha = .25 + .55 * (0.5 + 0.5 * Math.sin(t / 1000 * s.s + s.p));
-    sctx.fillStyle = "#fff"; sctx.beginPath(); sctx.arc(s.x, s.y, s.r, 0, 6.28); sctx.fill();
+    sctx.beginPath(); sctx.arc(s.x, s.y, s.r, 0, 6.28); sctx.fill();
   }
-  // luna
-  const mx = w * .82, my = h * .16;
-  const halo = sctx.createRadialGradient(mx, my, 10, mx, my, 160);
-  halo.addColorStop(0, "rgba(255,220,170,.22)"); halo.addColorStop(1, "rgba(255,220,170,0)");
-  sctx.globalAlpha = 1; sctx.fillStyle = halo; sctx.beginPath(); sctx.arc(mx, my, 160, 0, 6.28); sctx.fill();
-  sctx.fillStyle = "rgba(255,236,205,.35)"; sctx.beginPath(); sctx.arc(mx, my, 34, 0, 6.28); sctx.fill();
-  // edificios
+  sctx.globalAlpha = 1; sctx.drawImage(fondo, 0, 0, w, h);   // luna y edificios por encima de las estrellas
   sctx.globalAlpha = .55;
-  for (const b of skyline) {
-    sctx.fillStyle = "#06050c"; sctx.fillRect(b.x, h - b.bh, b.bw, b.bh);
-    for (const [wx, wy, f] of b.wins) {
-      sctx.fillStyle = f > .15 || Math.sin(t / 2500 + f * 50) > -.6 ? "rgba(255,179,92,.7)" : "rgba(255,179,92,.1)";
-      sctx.fillRect(wx, wy, 3, 3);
-    }
+  for (const [wx, wy, v] of parpadeo) {
+    sctx.fillStyle = Math.sin(t / 2500 + v * 50) > -.6 ? "rgba(255,179,92,.7)" : "rgba(255,179,92,.1)";
+    sctx.fillRect(wx, wy, 3, 3);
   }
-  // ~8 fps basta para el titileo; con la pestaña oculta se espera sin dibujar
-  setTimeout(() => requestAnimationFrame(drawSky), document.hidden ? 1000 : 125);
+  setTimeout(() => requestAnimationFrame(drawSky), 125);   // ~8 fps basta para el titileo
 }
 let skyResize;
 addEventListener("resize", () => { clearTimeout(skyResize); skyResize = setTimeout(buildSky, 150); });
@@ -1330,7 +1316,7 @@ async function refresh() {
   const live = s.stream.running && s.stream.mode === "directo";
 
   // generación
-  $("g-btn").disabled = s.gen.running;
+  $("g-btn").disabled = $("g-prueba").disabled = s.gen.running;
   const gp = $("g-prog");
   gp.classList.toggle("indet", s.gen.running && s.gen.done === 0);
   gp.querySelector("i").style.width = s.gen.total ? (s.gen.done / s.gen.total * 100) + "%" : "0";
@@ -1401,13 +1387,11 @@ async function refresh() {
   youtubeUrl = s.youtube_url || "";
   $("s-yturl").textContent = youtubeUrl ? youtubeUrl.replace(/^https:\/\/(www\.)?/, "") : "añade el enlace de tu canal o directo";
   $("s-yturl").title = youtubeUrl; $("s-ytopen").href = youtubeUrl || "#"; $("s-ytopen").hidden = !youtubeUrl;
-  $("s-vlcurl").textContent = `rtsp://${location.hostname}:8554/radio`;
   $("s-stop").disabled = !s.stream.running;
   $("s-box").className = "broadcast" + (live ? " live" : local ? " test" : "") + (s.stream.running ? " conplayer" : "");
   $("s-player").hidden = !s.stream.running; $("s-idle").hidden = s.stream.running;
   $("s-badge").textContent = live ? "● EN DIRECTO" : "● VISTA PREVIA";
   $("s-badge").className = "pill badge " + (live ? "live" : "warn");
-  $("q-skip").disabled = !s.stream.running;
   pintarAleatorio("q-shuffle", s.aleatorio?.video, "los videos en bucle se emiten", "los videos en bucle se emitirán");
   pintarAleatorio("m-shuffle", s.aleatorio?.musica, "las canciones suenan", "las canciones sonarán");
   if (s.stream.running) conectarDirecto(); else desconectarDirecto();
@@ -1442,7 +1426,7 @@ function verLog(n) {
 }
 function abrirLogs() {
   cerrarStats(); $("logs").classList.add("open"); $("logbtn").classList.add("on");
-  verLog(logActual); clearInterval(logTimer); logTimer = setInterval(cargarLogs, 2000);
+  verLog(logActual); clearInterval(logTimer); logTimer = setInterval(() => { if (!document.hidden) cargarLogs(); }, 2000);
 }
 function cerrarLogs() { $("logs").classList.remove("open"); $("logbtn").classList.remove("on"); clearInterval(logTimer); }
 // ---------------- Stats (uso del contenedor y del servidor) ----------------
@@ -1513,7 +1497,7 @@ async function cargarStats() {
 }
 function abrirStats() {
   cerrarLogs(); $("statsdrawer").classList.add("open"); $("statsbtn").classList.add("on");
-  cargarStats(); clearInterval(statsTimer); statsTimer = setInterval(cargarStats, 2000);
+  cargarStats(); clearInterval(statsTimer); statsTimer = setInterval(() => { if (!document.hidden) cargarStats(); }, 2000);
 }
 function cerrarStats() { $("statsdrawer").classList.remove("open"); $("statsbtn").classList.remove("on"); clearInterval(statsTimer); }
 function copiarLog() { navigator.clipboard?.writeText($("s-log").textContent).then(() => toast("Log copiado"), () => toast("No se pudo copiar", true)); }
@@ -1622,8 +1606,12 @@ const pxDrop = $("px-drop");
 ["dragleave", "drop"].forEach(ev => pxDrop.addEventListener(ev, e => { e.preventDefault(); pxDrop.classList.remove("over"); }));
 pxDrop.addEventListener("drop", e => { if (e.dataTransfer.files[0]) { cerrarPixabay(); subirVideo(e.dataTransfer.files[0]); } });
 $("px-file").addEventListener("change", e => { if (e.target.files[0]) { cerrarPixabay(); subirVideo(e.target.files[0]); } e.target.value = ""; });
-document.addEventListener("click", e => { if (!e.target.closest("#px-wrap")) cerrarPixabay(); });
-document.addEventListener("click", e => { if (!e.target.closest(".compose-wrap:not(.pixa-wrap)")) cerrarComponer(); });
+// clic fuera de un desplegable (Pixabay, Componer, Subir): se cierra
+document.addEventListener("click", e => {
+  if (!e.target.closest("#px-wrap")) cerrarPixabay();
+  if (!e.target.closest(".compose-wrap:not(.pixa-wrap)")) cerrarComponer();
+  if (!e.target.closest("#up-wrap")) cerrarSubida();
+});
 
 // ---------------- acciones ----------------
 function verComp(t) {
@@ -1685,7 +1673,6 @@ $("m-estilos").addEventListener("click", e => {
 function stepE(d) { const o = $("e-count"); o.value = o.textContent = Math.max(1, Math.min(5, +o.textContent + d)); }
 function abrirSubida(e) { e.stopPropagation(); $("up-pop").classList.toggle("open"); $("up-open").classList.toggle("on", $("up-pop").classList.contains("open")); }
 function cerrarSubida() { $("up-pop").classList.remove("open"); $("up-open").classList.remove("on"); }
-document.addEventListener("click", e => { if (!e.target.closest("#up-wrap")) cerrarSubida(); });
 try { if (localStorage.getItem("g-sinfondo") === "0") $("g-sinfondo").checked = false; } catch (e) {}
 function step(d) { const o = $("g-count"); o.value = o.textContent = Math.max(1, Math.min(20, +o.textContent + d)); }
 
@@ -1833,7 +1820,7 @@ function pintarVideos(s) {
           <img class="vthumb2" draggable="false" data-act="ver" src="/videos/${encodeURIComponent(c.video.replace(/\.mp4$/, ".jpg"))}?v=${v.size || 0}" alt="">
           <div class="vname"><div class="vtitle"><b title="doble clic para cambiar el nombre · archivo: ${esc(c.video)}">${esc(nombreVideo(c.video))}</b>${emit ? '<span class="ldot">EN DIRECTO</span>' : ""}<button class="iconbtn vedit" data-act="renombrar" title="cambiar el nombre">${ICON_EDIT}</button></div><small class="vest">${est}</small></div>
           <div class="vflags"><label class="switch" title="${c.activo ? "se emite en bucle" : "no se emite"}"><input type="checkbox" data-act="activo" ${c.activo ? "checked" : ""}><span></span></label><label class="switch niebla" title="${c.niebla ? "neblina activada: una capa de niebla en movimiento por encima" : "neblina: añade una capa de niebla en movimiento (útil en videos hechos de una foto)"}"><input type="checkbox" data-act="niebla" ${c.niebla ? "checked" : ""}><span></span></label></div>
-          <div class="hours tiempo" title="tiempo que se repite este video antes de pasar al siguiente">
+          <div class="hours" title="tiempo que se repite este video antes de pasar al siguiente">
             <input type="number" min="0" max="720" step="1" value="${Math.floor(Math.round(c.hours * 60) / 60)}" data-act="horas" data-parte="h" aria-label="horas"><span>h</span>
             <input type="number" min="0" max="59" step="5" value="${Math.round(c.hours * 60) % 60}" data-act="horas" data-parte="m" aria-label="minutos"><span>min</span>
           </div>
@@ -1904,12 +1891,9 @@ function tickCola() {
         : `pieza ${pz.n} · ${pz.seccion} (${pz.idx}/${pz.total}) · ${fmt(pos)} / ${fmt(pz.dur)} · ${i.inst} + ${i.instMel}${pz.capa ? " + " + pz.capa : ""}${pz.inst2 ? " + " + pz.inst2 : ""} · batería ${i.bat} · bajo ${pz.bajo}`;
       $("m-live-bar").style.width = pz.dur ? Math.min(100, pos / pz.dur * 100) + "%" : "0";
       $("inf-now").textContent = `forma ${pz.forma} · armonía ${pz.familia} · variedad ${pz.variedad}`;
-    } else {
-      $("m-live-t").textContent = `Radio infinita · ${i.estilo_nombre} · ${i.bpm} bpm`;
-      $("m-live-r").textContent = i.solo ? `tramo ${i.n} · ${fmt(Math.min(pas, dur))} / ${fmt(dur)} · solo melodía (${i.instMel}), sin acordes, bajo ni batería`
-                                         : `tramo ${i.n} · ${fmt(Math.min(pas, dur))} / ${fmt(dur)} · ${i.inst} + ${i.instMel} · batería ${i.bat} · ${i.modo}`;
-      $("m-live-bar").style.width = dur ? Math.min(100, pas / dur * 100) + "%" : "0";
-      $("inf-now").textContent = (i.cambios?.length ? "cambió: " + i.cambios.join(", ") : "");
+    } else {   // respaldo si faltara la pieza (no pasa con el compositor actual): estilo, tempo y posición del tramo
+      $("m-live-t").textContent = `Radio infinita · ${i.estilo_nombre} · ${i.bpm} bpm`; $("m-live-r").textContent = `tramo ${i.n} · ${fmt(Math.min(pas, dur))} / ${fmt(dur)}`;
+      $("m-live-bar").style.width = dur ? Math.min(100, pas / dur * 100) + "%" : "0"; $("inf-now").textContent = "";
     }
   } else if (mu.name) {
     const pas = Date.now() / 1000 - mu.inicio, dur = mu.dur || t?.dur || 0;
@@ -1942,7 +1926,7 @@ $("vlist").addEventListener("change", e => {
   else if (e.target.dataset.act === "niebla") { nieblaVideo(lista[i].video, e.target.checked); e.target.blur(); }
   else if (e.target.dataset.act === "horas") {
     // tiempo = horas + minutos; los minutos de más se pasan a horas (90 min → 1 h 30 min)
-    const caja = e.target.closest(".tiempo");
+    const caja = e.target.closest(".hours");
     const h = Math.max(0, parseInt(caja.querySelector('[data-parte="h"]').value, 10) || 0);
     const m = Math.max(0, parseInt(caja.querySelector('[data-parte="m"]').value, 10) || 0);
     const total = h * 60 + m, n = lista.map(c => ({...c}));
@@ -2058,11 +2042,14 @@ hacerOrdenable($("tracks"), ".track[data-name]", async filas => {
 });
 
 // ---------------- Video infinito (lluvia de letras tipo Matrix) ----------------
-let videoInf = null, vinfArrastrando = false;
+let videoInf = null, vinfArrastrando = false, firmaVinf = "";
 const VINF_RGB = {verde: "#30ff60", azul: "#4a9bff", cian: "#40e6e6", ambar: "#ffb030", rojo: "#ff4444", morado: "#b060ff", blanco: "#e6e6e6"};
 function pintarVideoInfinito(d, m) {
   if (!d) return;
   videoInf = d;
+  const firma = JSON.stringify([d, !!m, !!ultimoEstado?.stream?.running, vinfArrastrando]);
+  if (firma === firmaVinf) return;   // se llama cada segundo: si nada cambió, no se repinta
+  firmaVinf = firma;
   $("v-inf").classList.toggle("on", d.activo); $("v-inf").setAttribute("aria-pressed", String(d.activo));
   $("v-inf").title = d.activo ? "Video infinito activado: la cola de videos no se emite. Pulsa para volver a la cola" : "Video infinito: lluvia de letras tipo Matrix generada en tiempo real, en vez de la cola de videos";
   $("vinf-panel").hidden = !d.activo;
@@ -2098,10 +2085,14 @@ $("vinf-cant").addEventListener("input", e => { vinfArrastrando = true; $("vinf-
 $("vinf-cant").addEventListener("change", e => { vinfArrastrando = false; ajustarVideoInfinito({cantidad: +e.target.value}, `Cantidad ${e.target.value}`); });
 
 // ---------------- Radio infinita (música procedural en tiempo real) ----------------
-let infinita = null, infArrastrando = false;
+let infinita = null, infArrastrando = false, firmaInf = "";
 function pintarInfinita(d, estilos) {
   if (!d) return;
   infinita = d;
+  const i = ultimoEstado?.musica?.infinita;
+  const firma = JSON.stringify([d, i, Math.floor(Date.now() / 60000), infArrastrando, !!estilos]);
+  if (firma === firmaInf) return;   // nada cambió desde el último ciclo: no se tocan los chips
+  firmaInf = firma;
   $("m-inf").classList.toggle("on", d.activo); $("m-inf").setAttribute("aria-pressed", String(d.activo));
   $("m-inf").title = d.activo ? "Radio infinita activada: la música se compone en tiempo real y la lista no suena. Pulsa para volver a la lista"
                               : "Radio infinita: compone música lofi en tiempo real, sin fin y sin usar la lista";
@@ -2115,7 +2106,7 @@ function pintarInfinita(d, estilos) {
   document.querySelectorAll("#inf-estilos .escena").forEach(x => x.classList.toggle("on", sel.has(x.dataset.estilo)));
   $("inf-rota").hidden = sel.size < 2;
   document.querySelectorAll("#inf-rota .chip").forEach(c => c.classList.toggle("on", +c.dataset.min === d.rotar_min));
-  const i = ultimoEstado?.musica?.infinita, nom = k => estilosMusica[k]?.nombre || k;
+  const nom = k => estilosMusica[k]?.nombre || k;
   $("inf-rota-txt").textContent = sel.size > 1 && d.rotar_min === 0 ? `mezcla: ${d.estilos.map(nom).join(" + ")}`
     : i?.rota_en && sel.size > 1 ? `ahora ${nom(i.estilo)} · luego ${nom(i.siguiente || sig(d.estilos, i.estilo))} en ${Math.max(0, Math.ceil((i.rota_en - Date.now() / 1000) / 60))} min` : "";
   $("inf-auto").classList.toggle("on", !d.bpm);
@@ -2345,6 +2336,7 @@ async function stopStream() {
 }
 
 $("pb-play").innerHTML = ICON_PLAY;
+$("s-vlcurl").textContent = `rtsp://${location.hostname}:8554/radio`;   // no cambia: se pone una vez
 refresh();
 setInterval(() => { if (!document.hidden) refresh(); }, 3000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });

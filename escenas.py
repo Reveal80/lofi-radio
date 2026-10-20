@@ -6,8 +6,6 @@ app.py hace caer en bucle con ffmpeg. Cada llamada sale distinta.
 
 Tipos: noche, amanecer, dia, atardecer, lluvia, nieve, aurora y aleatorio.
 """
-import random
-
 import numpy as np
 
 W, H = 1920, 1080
@@ -80,10 +78,9 @@ def _disco(img, yy, xx, rng, x, y, r, color, halo):
     d = np.sqrt((xx - x) ** 2 + (yy - y) ** 2)
     img += np.exp(-np.maximum(d - r, 0) / rng.uniform(60, 130))[..., None] * np.array(color, float) * halo
     img[d < r] = color
-    return d
 
 
-def _nubes(img, yy, xx, rng, n, tinte, alto=.5):
+def _nubes(img, rng, n, tinte, alto=.5):
     """Nubes suaves: grupos de manchas gaussianas alargadas."""
     capa = np.zeros((H, W))
     for _ in range(n):
@@ -173,7 +170,7 @@ def _guardar(path, img):
 def make_scene(path, tipo="noche", capa_path=None):
     """Pinta la escena. Devuelve (título, tipo de partículas o None).
     Si hay partículas, guarda su capa en capa_path."""
-    rng = np.random.default_rng(random.randrange(1 << 30))
+    rng = np.random.default_rng()
     if tipo not in TIPOS or tipo == "aleatorio":
         tipo = str(rng.choice([t for t in TIPOS if t != "aleatorio"]))
     c = _cfg(tipo, rng)
@@ -198,7 +195,7 @@ def make_scene(path, tipo="noche", capa_path=None):
         _disco(img, yy, xx, rng, rng.uniform(.15, .85) * W, rng.uniform(*s["y"]) * H,
                rng.uniform(*s["r"]), s["color"], s["halo"])
     if c.get("nubes"):
-        _nubes(img, yy, xx, rng, int(rng.integers(*c["nubes"])), c["tinte_nubes"],
+        _nubes(img, rng, int(rng.integers(*c["nubes"])), c["tinte_nubes"],
                alto=.75 if tipo == "lluvia" else .5)
     if c.get("niebla"):
         img[:] = img * (1 - c["niebla"]) + np.array(c["bot"], float) * c["niebla"]
