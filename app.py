@@ -10,6 +10,7 @@ import random
 import re
 import secrets
 import shutil
+import string
 import signal as sig
 import subprocess
 import threading
@@ -25,7 +26,7 @@ import escenas
 import lofigen
 import piezas
 
-VERSION = "3.5"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
+VERSION = "3.6"   # sube 0,1 con cada cambio de código de la imagen (se muestra en la barra superior del panel)
 BASE = Path(__file__).parent
 TRACKS_DIR = BASE / "data" / "tracks"
 VIDEOS_DIR = BASE / "data" / "videos"    # biblioteca de videos + cola
@@ -34,6 +35,9 @@ for d in (TRACKS_DIR, VIDEOS_DIR, LOGS_DIR):
     d.mkdir(parents=True, exist_ok=True)
 # CONFIG_FILE puede apuntar a otra ruta (la imagen Docker la guarda en data/ para que persista)
 CONFIG_FILE = Path(os.environ.get("CONFIG_FILE", BASE / "config.json"))
+# AUTOR (opcional, en el compose): nombre que llevan como artista las canciones subidas, en vez del que traiga
+# el archivo (Suno graba el usuario de la cuenta). Vacío = se respeta la etiqueta del archivo.
+AUTOR = os.environ.get("AUTOR", "").strip()[:60]
 COLA_FILE = VIDEOS_DIR / "cola.json"
 TITULOS_FILE = VIDEOS_DIR / "titulos.json"     # nombre visible de cada video (el archivo no cambia)
 TITULOS_MUSICA = TRACKS_DIR / "titulos.json"   # títulos editados de las canciones
@@ -93,6 +97,7 @@ def escribir_json(p, datos):
     tmp = p.with_name(f".{p.name}.{threading.get_ident()}.tmp")
     tmp.write_text(json.dumps(datos, ensure_ascii=False))
     tmp.replace(p)
+    _jcache.pop(p, None)   # dos escrituras en el mismo tic del reloj comparten mtime: la caché no debe sobrevivir
 
 
 def load_config():
@@ -423,9 +428,11 @@ def audio_job(src, nombre, etiquetas):
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-map", "0:a:0", "-vn", *codec,
                         "-map_metadata", "-1", "-id3v2_version", "3", "-metadata", f"title={titulo}",
                         "-metadata", f"album=Tema {etiquetas.get('artist') or 'subida'}",
+                        *(["-metadata", f"artist={etiquetas['artist']}"] if etiquetas.get("artist") else []),
                         *(["-metadata", f"comment={pagina}"] if pagina else []),
                         "-f", "mp3", str(parcial)], check=True, capture_output=True, text=True)
         parcial.replace(mp3)   # aparece en la lista solo cuando está completo
+        _desdoblar(mp3.name, titulo)
     except subprocess.CalledProcessError as e:
         video_state["error"] = (e.stderr or str(e))[-400:]
     except Exception as e:
@@ -435,6 +442,38 @@ def audio_job(src, nombre, etiquetas):
             parcial.unlink(missing_ok=True)   # solo el suyo: puede haber una composición en curso
         src.unlink(missing_ok=True)
         video_state["running"] = False
+
+
+_LETRA = re.compile(r"^(.*\S)\s+([A-Z])$")   # «Focus Flow B» → («Focus Flow», «B»)
+
+
+def _desdoblar(nuevo, titulo):
+    """Si ya hay canciones con el mismo título (Suno entrega dos variantes por petición), se distinguen
+    con letras: las que no la tengan reciben una («Título A») y la nueva, la siguiente libre («Título B»)."""
+    m = _LETRA.match(titulo)
+    base = m.group(1) if m else titulo
+    tit = load_titulos(TITULOS_MUSICA)
+    iguales = []
+    for p in TRACKS_DIR.glob("*.mp3"):
+        if p.name == nuevo:
+            continue
+        t = tit.get(p.name) or track_meta(p)["title"]
+        m2 = _LETRA.match(t)
+        b, letra = (m2.group(1), m2.group(2)) if m2 else (t, "")
+        if b.casefold() == base.casefold():
+            iguales.append((p.name, letra))
+    if not iguales:
+        return
+    usadas = {letra for _, letra in iguales if letra}
+    libre_ = lambda: next(c for c in string.ascii_uppercase if c not in usadas)
+    with _io_lock:   # una sola escritura con todos los cambios
+        tit = dict(load_titulos(TITULOS_MUSICA))
+        for nombre, letra in iguales:
+            if not letra:
+                letra = libre_(); usadas.add(letra)
+                tit[nombre] = f"{base} {letra}"
+        tit[nuevo] = f"{base} {libre_()}"
+        escribir_json(TITULOS_MUSICA, tit)
 
 
 _GENERICO = re.compile(r"^\s*\d[\d.,\s]*\s*(pistas|tracks|canciones)|regal[ií]as|derechos de autor"
@@ -483,6 +522,8 @@ def _repartir(tmp, nombre, titulo="", artista="", pagina=""):
             etiquetas["artist"] = artista
             if etiquetas.get("title"):      # como lo quiere el usuario: «Tokyo Lofi - ZephiraMusic»
                 etiquetas["title"] = f"{etiquetas['title']} - {artista}"
+        elif AUTOR:
+            etiquetas["artist"] = AUTOR    # subida directa: el autor del compose manda sobre el del archivo
         if pagina:
             etiquetas["_pagina"] = pagina   # página original en Pixabay (va al comentario del MP3)
         threading.Thread(target=audio_job, args=(tmp, nombre, etiquetas), daemon=True).start()

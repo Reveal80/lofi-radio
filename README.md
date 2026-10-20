@@ -183,5 +183,6 @@ Los datos se conservan porque están en las carpetas montadas.
 ## Dentro de la imagen
 
 Python 3.12 con Flask, numpy y scipy, y ffmpeg 7. El código del panel está en `/app`.
-Variables de entorno: `PORT` (8750), `CONFIG_FILE` (`/app/data/config.json`) y
-`PREVIEW_RTMP` (`rtmp://mediamtx:1935/radio`).
+Variables de entorno: `PORT` (8750), `CONFIG_FILE` (`/app/data/config.json`),
+`PREVIEW_RTMP` (`rtmp://mediamtx:1935/radio`) y `AUTOR` (opcional: artista con el que se
+guardan las canciones subidas; si no se define, se respeta el que traiga el archivo).

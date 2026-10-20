@@ -17,6 +17,8 @@ services:
     volumes:
       - ./data:/app/data   # música, videos y config.json (clave de YouTube)
       - ./logs:/app/logs   # registros de la emisión
+    # environment:
+    #   AUTOR: "Tu nombre"   # opcional: artista con el que se guardan las canciones subidas (si no, el del archivo)
     # GPU integrada (opcional): quita el «#» de las tres líneas siguientes para ceder la gráfica del
     # servidor al contenedor (Intel/AMD por VAAPI). Solo si existe /dev/dri/renderD128 en el servidor;
     # si no, el contenedor no arrancaría.
