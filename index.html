@@ -694,7 +694,7 @@
         <a class="btn sm primary" id="px-mark" href="#" onclick="event.preventDefault(); toast('Arrástralo a la barra de marcadores (no hace falta pulsarlo aquí)')">⤓ Importar a Radio Lofi</a>
       </div>
       <label class="drop" id="px-drop" style="margin-top:10px">
-        <input type="file" accept="audio/*,video/*,image/*,.mp3" hidden id="px-file">
+        <input type="file" multiple accept="audio/*,video/*,image/*,.mp3" hidden id="px-file">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></div>
         <div><b>…o arrastra aquí el MP3 descargado</b><small>se añade al final de Música</small></div>
       </label>
@@ -796,9 +796,9 @@
           <div class="popover uppop" id="up-pop">
             <div class="card-h"><h2>Subir a la biblioteca</h2></div>
             <label class="drop" id="v-drop">
-              <input id="v-file" type="file" accept="audio/*,video/*,image/*,.mp3,.wav,.flac,.m4a,.ogg,.mkv,.jpg,.jpeg,.png,.webp" hidden>
+              <input id="v-file" type="file" multiple accept="audio/*,video/*,image/*,.mp3,.wav,.flac,.m4a,.ogg,.mkv,.jpg,.jpeg,.png,.webp" hidden>
               <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></div>
-              <div><b>Elige o arrastra música, un video o una imagen</b><small id="v-fname">mp3, wav… → Música · mp4, mkv… → Videos · jpg, png… → Videos (imagen fija de 10 s en bucle)</small></div>
+              <div><b>Elige o arrastra música, videos o imágenes (varios a la vez)</b><small id="v-fname">mp3, wav… → Música · mp4, mkv… → Videos · jpg, png… → Videos (imagen fija de 10 s en bucle)</small></div>
             </label>
             <div class="progress" id="v-upprog" style="display:none; margin-top:12px"><i></i></div>
             <p class="hint" style="margin:10px 0 0; font-size:12px">Se detecta solo: el audio va a <b>Música</b> (entra en el directo al azar); los videos y las imágenes a <b>Videos</b>, desactivados hasta que actives «en bucle». Una imagen se convierte en un video fijo de 10 s sin audio, que ocupa muy poco.</p>
@@ -827,7 +827,7 @@
           </button>
         </div>
         <div class="infpanel" id="inf-panel" hidden>
-          <div class="ih"><b>Radio infinita</b><span>la música se compone sola mientras suena. Marca uno o varios estilos (con varios, va rotando) y el tempo; los cambios entran en el siguiente compás</span><small id="inf-now"></small></div>
+          <div class="ih"><b>Radio infinita</b><span>la música se compone sola mientras suena. Marca uno o varios estilos (con varios, va rotando) y el tempo</span></div>
           <div class="escenas" id="inf-estilos"></div>
           <div class="inf-rota" id="inf-rota" hidden><span>Con varios estilos:</span><button class="chip" data-min="0" title="Un solo estilo que suma los marcados: instrumentos, ritmos y tempos de todos ellos">Mezclar</button><span style="color:var(--dim)">o cambiar cada</span><button class="chip" data-min="15">15 min</button><button class="chip" data-min="30">30 min</button><button class="chip" data-min="60">1 h</button><button class="chip" data-min="120">2 h</button><button class="chip" data-min="240">4 h</button><small id="inf-rota-txt"></small></div>
           <div class="inf-inst"><span title="Los del estilo van marcados; pulsa uno para quitarlo o para añadir otro. Entra en el siguiente tramo">Instrumentos</span><div class="chips" id="inf-inst-chips"><small id="inf-inst-nota" style="width:100%;order:100;font:11px var(--mono);color:var(--ok)"></small><button class="chip rnd" id="inf-inst-rnd" onclick="alternarAzar('inst_aleatorio')" aria-label="aleatorio" title="Sortea una combinación de 2 a 4 instrumentos (sin los que hayas quitado) y cambiará cada 30 minutos"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button></div></div>
@@ -1375,6 +1375,7 @@ async function refresh() {
   if (videoRunningPrev && !s.video.running && !s.video.error)
     toast(s.video.destino === "musica" ? "Canción añadida a Música 🎵" : "Video añadido a la biblioteca 🎞️");
   videoRunningPrev = s.video.running;
+  siguienteSubida(s);   // cola de «Subir»: el siguiente archivo entra cuando el servidor queda libre
   pintarVideos(s);
 
   // emisión
@@ -1604,8 +1605,8 @@ async function importarPixabay(e) {
 const pxDrop = $("px-drop");
 ["dragenter", "dragover"].forEach(ev => pxDrop.addEventListener(ev, e => { e.preventDefault(); pxDrop.classList.add("over"); }));
 ["dragleave", "drop"].forEach(ev => pxDrop.addEventListener(ev, e => { e.preventDefault(); pxDrop.classList.remove("over"); }));
-pxDrop.addEventListener("drop", e => { if (e.dataTransfer.files[0]) { cerrarPixabay(); subirVideo(e.dataTransfer.files[0]); } });
-$("px-file").addEventListener("change", e => { if (e.target.files[0]) { cerrarPixabay(); subirVideo(e.target.files[0]); } e.target.value = ""; });
+pxDrop.addEventListener("drop", e => { if (e.dataTransfer.files[0]) { cerrarPixabay(); subirArchivos(e.dataTransfer.files); } });
+$("px-file").addEventListener("change", e => { if (e.target.files[0]) { cerrarPixabay(); subirArchivos(e.target.files); } e.target.value = ""; });
 // clic fuera de un desplegable (Pixabay, Componer, Subir): se cierra
 document.addEventListener("click", e => {
   if (!e.target.closest("#px-wrap")) cerrarPixabay();
@@ -1704,40 +1705,74 @@ async function borrar(name) {
 const drop = $("v-drop");
 ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
 ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
-drop.addEventListener("drop", e => { if (e.dataTransfer.files[0]) subirVideo(e.dataTransfer.files[0]); });
-$("v-file").addEventListener("change", e => { if (e.target.files[0]) subirVideo(e.target.files[0]); e.target.value = ""; });
+drop.addEventListener("drop", e => { if (e.dataTransfer.files[0]) subirArchivos(e.dataTransfer.files); });
+$("v-file").addEventListener("change", e => { if (e.target.files[0]) subirArchivos(e.target.files); e.target.value = ""; });
 
+// Subida de varios archivos: el servidor procesa uno a la vez (`_ocupar`), así que se encolan y cada
+// uno se envía cuando el anterior ha terminado de convertirse (lo comprueba refresh() con s.video.running).
+const colaSubida = {pend: [], total: 0, hechos: 0, fallos: 0, enviando: false};
+function subirArchivos(files) {
+  const nuevos = [...files];
+  if (!nuevos.length) return;
+  if (!colaSubida.pend.length && !colaSubida.enviando) colaSubida.total = colaSubida.hechos = colaSubida.fallos = 0;
+  colaSubida.pend.push(...nuevos); colaSubida.total += nuevos.length;
+  if (colaSubida.total > 1) { toast(`${colaSubida.total} archivos en cola: se suben uno tras otro`); cerrarSubida(); }
+  $("v-fname").textContent = colaSubida.total > 1 ? `${colaSubida.total} archivos en cola` : nuevos[0].name;
+  siguienteSubida(ultimoEstado);
+}
+function siguienteSubida(s) {
+  if (colaSubida.enviando || !colaSubida.pend.length) return;
+  if (s && s.video.running) return;   // hay una conversión en marcha (de esta cola o de otro): toca esperar
+  colaSubida.enviando = true;
+  subirVideo(colaSubida.pend.shift());
+}
+function finSubida(ok) {
+  colaSubida.enviando = false;
+  if (ok) colaSubida.hechos++; else colaSubida.fallos++;
+  if (!colaSubida.pend.length && colaSubida.total > 1) {
+    const f = colaSubida.fallos;
+    toast(`${colaSubida.hechos} de ${colaSubida.total} archivos subidos${f ? ` (${f} con error)` : ""}`, f > 0);
+  }
+}
 function subirVideo(f) {
-  $("v-err").textContent = ""; $("v-fname").textContent = f.name;
+  const pos = colaSubida.total > 1 ? ` (${colaSubida.hechos + colaSubida.fallos + 1} de ${colaSubida.total})` : "";
+  $("v-err").textContent = ""; $("v-fname").textContent = f.name + pos;
   const bar = $("v-upprog"); bar.style.display = ""; bar.querySelector("i").style.width = "0";
   const fd = new FormData(); fd.append("archivo", f);
   const xhr = new XMLHttpRequest();
   xhr.open("POST", "/api/subir");
-  proceso = {tipo: "subiendo", nombre: f.name, pct: 0}; firmaLista = "";
+  proceso = {tipo: "subiendo", nombre: f.name + pos, pct: 0}; firmaLista = "";
   if (ultimoEstado) pintarVideos(ultimoEstado);
   xhr.upload.onprogress = e => {
     if (!e.lengthComputable) return;
     proceso.pct = Math.round(e.loaded / e.total * 100);
     bar.querySelector("i").style.width = proceso.pct + "%";
-    if ($("v-proc-txt")) { $("v-proc-txt").textContent = `Subiendo «${f.name}» · ${proceso.pct} %`; $("v-proc-bar").style.width = proceso.pct + "%"; }
+    if ($("v-proc-txt")) { $("v-proc-txt").textContent = `Subiendo «${f.name}»${pos} · ${proceso.pct} %`; $("v-proc-bar").style.width = proceso.pct + "%"; }
   };
   xhr.onload = () => {
     bar.style.display = "none";
     let j = {}; try { j = JSON.parse(xhr.responseText); } catch {}
-    proceso = xhr.status >= 400 ? {tipo: "", nombre: "", pct: 0} : {tipo: "convirtiendo", nombre: f.name, pct: 100};
+    if (xhr.status === 409) {   // otro archivo aún se está procesando: vuelve a la cola y se reintenta en el siguiente refresco
+      colaSubida.pend.unshift(f); colaSubida.enviando = false; proceso = {tipo: "", nombre: "", pct: 0}; firmaLista = ""; refresh(); return;
+    }
+    proceso = xhr.status >= 400 ? {tipo: "", nombre: "", pct: 0} : {tipo: "convirtiendo", nombre: f.name + pos, pct: 100};
     firmaLista = ""; knownTracks = "";
-    $("v-fname").textContent = "mp3, wav… → Música · mp4, mkv… → Videos · jpg, png… → Videos (imagen fija de 10 s en bucle)";
+    $("v-fname").textContent = colaSubida.pend.length ? (colaSubida.pend.length === 1 ? "1 archivo en cola" : `${colaSubida.pend.length} archivos en cola`) : "mp3, wav… → Música · mp4, mkv… → Videos · jpg, png… → Videos (imagen fija de 10 s en bucle)";
     if (xhr.status < 400) cerrarSubida();
-    if (xhr.status >= 400) { $("v-err").textContent = j.error || xhr.statusText; toast(j.error || "No se pudo subir", true); }
+    if (xhr.status >= 400) { $("v-err").textContent = `${f.name}: ${j.error || xhr.statusText}`; toast(`${f.name}: ${j.error || "no se pudo subir"}`, true); }
     else {
       const musica = j.tipo === "musica";
-      verTab(musica ? "musica" : "videos");   // se lleva al usuario a la sección donde aparecerá
-      toast(musica ? "Es audio: se añade a Música, convirtiendo…" : j.tipo === "imagen" ? "Es una imagen: se añade a Videos como video fijo de 10 s…" : "Es un video: se añade a Videos, convirtiendo…");
+      if (colaSubida.total === 1 || colaSubida.hechos === 0) verTab(musica ? "musica" : "videos");   // se lleva al usuario a la sección donde aparecerá
+      if (colaSubida.total === 1) toast(musica ? "Es audio: se añade a Música, convirtiendo…" : j.tipo === "imagen" ? "Es una imagen: se añade a Videos como video fijo de 10 s…" : "Es un video: se añade a Videos, convirtiendo…");
       videoRunningPrev = true;
     }
+    finSubida(xhr.status < 400);
     refresh();
   };
-  xhr.onerror = () => { bar.style.display = "none"; $("v-err").textContent = "error de red al subir"; proceso = {tipo: "", nombre: "", pct: 0}; firmaLista = ""; refresh(); };
+  xhr.onerror = () => {   // sin red: se para la cola entera (reintentar a ciegas solo repetiría el error)
+    bar.style.display = "none"; $("v-err").textContent = `error de red al subir «${f.name}»`; proceso = {tipo: "", nombre: "", pct: 0}; firmaLista = "";
+    colaSubida.pend.length = 0; finSubida(false); refresh();
+  };
   xhr.send(fd);
 }
 
@@ -1890,10 +1925,9 @@ function tickCola() {
       $("m-live-r").textContent = i.solo ? `pieza ${pz.n} · ${pz.seccion} (${pz.idx}/${pz.total}) · ${fmt(pos)} / ${fmt(pz.dur)} · solo melodía (${i.instMel})`
         : `pieza ${pz.n} · ${pz.seccion} (${pz.idx}/${pz.total}) · ${fmt(pos)} / ${fmt(pz.dur)} · ${i.inst} + ${i.instMel}${pz.capa ? " + " + pz.capa : ""}${pz.inst2 ? " + " + pz.inst2 : ""} · batería ${i.bat} · bajo ${pz.bajo}`;
       $("m-live-bar").style.width = pz.dur ? Math.min(100, pos / pz.dur * 100) + "%" : "0";
-      $("inf-now").textContent = `forma ${pz.forma} · armonía ${pz.familia} · variedad ${pz.variedad}`;
     } else {   // respaldo si faltara la pieza (no pasa con el compositor actual): estilo, tempo y posición del tramo
       $("m-live-t").textContent = `Radio infinita · ${i.estilo_nombre} · ${i.bpm} bpm`; $("m-live-r").textContent = `tramo ${i.n} · ${fmt(Math.min(pas, dur))} / ${fmt(dur)}`;
-      $("m-live-bar").style.width = dur ? Math.min(100, pas / dur * 100) + "%" : "0"; $("inf-now").textContent = "";
+      $("m-live-bar").style.width = dur ? Math.min(100, pas / dur * 100) + "%" : "0";
     }
   } else if (mu.name) {
     const pas = Date.now() / 1000 - mu.inicio, dur = mu.dur || t?.dur || 0;
