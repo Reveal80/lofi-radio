@@ -903,8 +903,8 @@ def start_stream(local=False):
             return "la emisión ya está en marcha"
         if not any((VIDEOS_DIR / c["video"]).exists() for c in load_cola() if c.get("activo") is not False):
             return "activa «en bucle» al menos un video (Biblioteca → Videos)"
-        if not any(TRACKS_DIR.glob("*.mp3")):
-            return "no hay pistas: genera música primero"
+        if not any(TRACKS_DIR.glob("*.mp3")) and not estado_infinita()["activo"]:   # la radio infinita no necesita pistas
+            return "no hay pistas: sube o compón música, o activa la radio infinita"
         if not local and not key:
             return "guarda la clave de emisión RTMP primero"
         dest = None if local else f"{YOUTUBE_RTMP}/{key}"
