@@ -93,7 +93,7 @@ services:
     restart: unless-stopped
 
   apache:
-    image: php:8.3-apache
+    image: php:8.4-apache
     logging:
       driver: json-file
       options: { max-size: "5m", max-file: "1" }

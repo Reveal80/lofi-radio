@@ -44,7 +44,7 @@ services:
     restart: unless-stopped
 
   apache:
-    image: php:8.3-apache
+    image: php:8.4-apache
     container_name: lofi-apache
     logging: *logging
     depends_on:
