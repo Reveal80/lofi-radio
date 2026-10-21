@@ -93,7 +93,7 @@ services:
     restart: unless-stopped
 
   apache:
-    image: php:8.4-apache
+    image: httpd:2.4
     logging:
       driver: json-file
       options: { max-size: "5m", max-file: "1" }
@@ -103,8 +103,8 @@ services:
       - "${HTTP_PORT:-8080}:80"
     configs:
       - source: radio_conf
-        target: /etc/apache2/sites-available/000-default.conf
-    command: sh -c "a2enmod proxy proxy_http >/dev/null && exec apache2-foreground"
+        target: /usr/local/apache2/conf/extra/radio.conf
+    command: ["httpd-foreground", "-c", "ServerName localhost", "-c", "LoadModule proxy_module modules/mod_proxy.so", "-c", "LoadModule proxy_http_module modules/mod_proxy_http.so", "-c", "Include conf/extra/radio.conf"]
     restart: unless-stopped
 
 configs:
@@ -119,9 +119,9 @@ configs:
           ProxyPassReverse /live/ http://mediamtx:8888/
           ProxyPass        / http://python:8750/
           ProxyPassReverse / http://python:8750/
-          ErrorLog $${APACHE_LOG_DIR}/error.log
+          ErrorLog /proc/self/fd/2
           SetEnvIf Request_URI "^/(api/(state|logs)|live/)" sondeo
-          CustomLog $${APACHE_LOG_DIR}/access.log combined env=!sondeo
+          CustomLog /proc/self/fd/1 combined env=!sondeo
       </VirtualHost>
 ```
 

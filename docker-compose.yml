@@ -44,7 +44,7 @@ services:
     restart: unless-stopped
 
   apache:
-    image: php:8.4-apache
+    image: httpd:2.4
     container_name: lofi-apache
     logging: *logging
     depends_on:
@@ -52,8 +52,8 @@ services:
     ports:
       - "${HTTP_PORT:-8080}:80"
     volumes:
-      - ./apache/radio.conf:/etc/apache2/sites-available/000-default.conf:ro
-    command: sh -c "a2enmod proxy proxy_http >/dev/null && exec apache2-foreground"
+      - ./apache/radio.conf:/usr/local/apache2/conf/extra/radio.conf:ro
+    command: ["httpd-foreground", "-c", "ServerName localhost", "-c", "LoadModule proxy_module modules/mod_proxy.so", "-c", "LoadModule proxy_http_module modules/mod_proxy_http.so", "-c", "Include conf/extra/radio.conf"]
     restart: unless-stopped
 
 volumes:
