@@ -171,6 +171,76 @@ ponle delante un proxy con autenticación o una VPN.
 - La clave de YouTube solo se guarda en tu servidor y solo se usa para el RTMP de YouTube.
 - No se llama a ninguna API externa. La única salida a Internet es la emisión RTMP hacia YouTube.
 
+## Música propia generada con IA (opcional)
+
+Las canciones con licencia libre (Pixabay y similares) pueden recibir reclamaciones de Content ID en
+YouTube aunque su licencia lo permita. Una forma de evitarlo es generar música propia. **Esto no forma
+parte de la imagen**: se hace aparte, en un contenedor temporal, y luego se suben los MP3 desde el panel.
+
+Hay dos caminos:
+
+| Opción | Ventajas | Inconvenientes |
+|---|---|---|
+| Servicio de pago (p. ej. Suno) | Calidad alta y rápido | Plan de pago para uso comercial |
+| [MusicGen](https://huggingface.co/facebook/musicgen-small) de Meta en tu servidor | Gratis y local | Lento sin GPU NVIDIA |
+
+### Velocidad orientativa de MusicGen (`musicgen-small`)
+
+| Equipo | Tiempo de cálculo |
+|---|---|
+| CPU de 2 núcleos (i7-6700) | ~25 s por cada segundo de audio (10 min de música ≈ 4 h) |
+| GPU NVIDIA | Minutos por canción; necesaria para muchas horas de música |
+
+Con CPU basta generar 2-3 minutos de material por canción y montarlos a compás hasta 10 minutos
+(trozos de 4 compases con fundidos), en vez de generar los 10 minutos enteros.
+
+### Contenedor temporal
+
+```bash
+mkdir -p ~/musicgen/out && cd ~/musicgen
+docker run --rm -it --cpu-shares 64 -v "$PWD":/work -w /work python:3.12-slim bash
+# dentro del contenedor:
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install transformers soundfile scipy
+```
+
+`--cpu-shares 64` le da prioridad baja para no quitar CPU al codificador del directo.
+
+### Generar una pieza
+
+```python
+# gen.py: python gen.py "prompt" salida.wav segundos
+import sys, torch, soundfile as sf
+from transformers import AutoProcessor, MusicgenForConditionalGeneration
+prompt, salida, seg = sys.argv[1], sys.argv[2], float(sys.argv[3])
+proc = AutoProcessor.from_pretrained("facebook/musicgen-small")
+model = MusicgenForConditionalGeneration.from_pretrained("facebook/musicgen-small").eval()
+inp = proc(text=[prompt], padding=True, return_tensors="pt")
+with torch.no_grad():                       # 50 tokens = 1 s; el modelo da como mucho ~30 s por llamada
+    y = model.generate(**inp, do_sample=True, guidance_scale=3.0, max_new_tokens=int(min(seg, 30) * 50))
+sf.write(salida, y[0, 0].numpy(), 32000)
+```
+
+Para piezas más largas se encadenan trozos de 30 s pasando los últimos ~10 s de audio como pista
+(`proc(audio=[pista], sampling_rate=32000, text=[prompt], ...)`).
+
+Ejemplo de prompt que funciona bien:
+
+```
+lo-fi jazz hop, warm Rhodes electric piano chords and gentle jazz piano, soft brushed drums,
+deep mellow bass, 72 bpm, cozy morning cafe, relaxed, muffled and warm
+```
+
+### Pasar a MP3 y subir
+
+```bash
+ffmpeg -i out/pieza.wav -af "highpass=f=28,lowpass=f=9000,loudnorm=I=-14" -ar 44100 -ac 2 \
+  -c:a libmp3lame -b:a 320k -metadata title="Café de mañana" pieza.mp3
+```
+
+Después se sube `pieza.mp3` desde el botón «Subir» del panel. Como referencia, el lofi suena bien cuando
+tiene la mayor parte de la energía por debajo de 200 Hz y casi nada por encima de 2 kHz.
+
 ## Actualizar
 
 ```bash
